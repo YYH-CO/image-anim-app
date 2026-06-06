@@ -1,21 +1,12 @@
-import os, requests, io, random
-from flask import Flask, render_template, request, send_file, jsonify
-from PIL import Image, ImageDraw, ImageFont
+import os, requests
+from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+SHARE_CODE = os.getenv("SHARE_CODE", "")
 
-def _get_font(size):
-    paths = [
-        "/System/Library/Fonts/Helvetica.ttc", "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "C:\\Windows\\Fonts\\arial.ttf", "C:\\Windows\\Fonts\\Arial.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-    ]
-    for p in paths:
-        if os.path.exists(p):
-            return ImageFont.truetype(p, size)
-    return ImageFont.load_default()
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
 
 
 @app.route("/")
@@ -23,19 +14,36 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/generate", methods=["POST"])
-def generate():
-    data = request.json
-    prompt = data.get("prompt", "")
+@app.route("/optimize-prompt", methods=["POST"])
+def optimize_prompt():
+    data = request.get_json(force=True)
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "伺服器未設定 GEMINI_API_KEY"}), 500
+    if SHARE_CODE and data.get("code") != SHARE_CODE:
+        return jsonify({"error": "共享密碼錯誤"}), 403
+
+    prompt = data.get("prompt", "").strip()
     if not prompt:
-        return jsonify({"error": "請輸入提示詞"}), 400
-    w, h = int(data.get("width", 1024)), int(data.get("height", 1024))
+        return jsonify({"error": "請輸入內容"}), 400
+
+    payload = {
+        "contents": [{
+            "parts": [{
+                "text": "You are a prompt engineer. Translate and expand the following user request into a detailed, cinematic English prompt for AI image generation. Output ONLY the final prompt text, nothing else. Request: " + prompt
+            }]
+        }]
+    }
     try:
-        url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width={w}&height={h}&seed={random.randint(0,99999)}"
-        resp = requests.get(url, timeout=30)
-        if resp.status_code == 200:
-            return send_file(io.BytesIO(resp.content), mimetype="image/jpeg")
-        return jsonify({"error": f"生成失敗 ({resp.status_code})"}), 502
+        resp = requests.post(
+            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            json=payload,
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            return jsonify({"error": f"Gemini 錯誤 ({resp.status_code})"}), 502
+        result = resp.json()
+        text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return jsonify({"optimized_prompt": text})
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 502
 

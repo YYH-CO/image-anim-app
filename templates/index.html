@@ -3,153 +3,102 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>AI 迷因生圖室</title>
+<title>AI 圖片生成器</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, "Segoe UI", Helvetica, sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.card { background: #1a1a2e; max-width: 700px; width: 100%; padding: 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
-h1 { font-size: 24px; text-align: center; margin-bottom: 4px; }
+body { font-family: -apple-system, "Segoe UI", Helvetica, sans-serif; background: #121214; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.card { background: #1a1a2e; max-width: 600px; width: 100%; padding: 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
-.row { display: flex; gap: 8px; flex-wrap: wrap; }
-.row > * { flex: 1; min-width: 120px; }
-input, select, button { padding: 12px 14px; font-size: 15px; border-radius: 8px; border: 1px solid #333; background: #16213e; color: #eee; outline: none; }
-input:focus, select:focus { border-color: #4a9eff; }
-button { background: #4a9eff; color: #fff; font-weight: 600; cursor: pointer; border: none; }
-button:hover { background: #3a8aee; }
+input, button { width: 100%; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #333; outline: none; }
+input { background: #222; color: #eee; margin-bottom: 12px; }
+input:focus { border-color: #00f5d4; }
+button { background: #00f5d4; color: #000; font-weight: 600; cursor: pointer; border: none; font-size: 16px; }
+button:hover { background: #00bbf9; color: #fff; }
 button:disabled { opacity: 0.5; cursor: default; }
 #loading { display: none; text-align: center; padding: 30px; color: #888; font-size: 14px; }
 #loading.show { display: block; }
 #result { display: none; margin-top: 16px; }
 #result.show { display: block; }
-#canvasWrap { position: relative; margin-top: 12px; border-radius: 12px; overflow: hidden; background: #111; }
-canvas { width: 100%; display: block; background: #111; }
-.meme-inputs { display: flex; gap: 8px; margin-top: 12px; }
-.meme-inputs input { flex: 1; font-size: 14px; padding: 10px 12px; }
-.actions { display: flex; gap: 8px; margin-top: 12px; }
-.actions button { flex: 1; }
-.btn-dl { background: #22c55e; }
-.btn-dl:hover { background: #16a34a; }
-.btn-retry { background: #666; }
-.btn-retry:hover { background: #555; }
-.error { color: #ff6b6b; text-align: center; padding: 20px; font-size: 14px; }
-footer { text-align: center; margin-top: 16px; color: #555; font-size: 12px; }
+#result img { max-width: 100%; width: 100%; border-radius: 12px; box-shadow: 0 4px 25px rgba(0,245,212,0.15); display: block; background: #111; }
+.preview-box { background: #222; padding: 12px; border-radius: 8px; font-size: 13px; color: #00f5d4; word-break: break-all; margin-top: 10px; }
+.error { color: #ff6b6b; text-align: center; padding: 20px; font-size: 14px; display: none; }
+.hint { text-align: center; color: #555; font-size: 12px; margin-top: 12px; }
 </style>
 </head>
 <body>
 <div class="card">
-  <h1>🎨 AI 迷因生圖室</h1>
-  <p class="sub">輸入畫面描述 → 生成圖片 → 加上迷因文字 → 下載</p>
+  <h1>🎨 AI 圖片生成器</h1>
+  <p class="sub">中文輸入 → Gemini 翻譯 → Pollinations 繪圖</p>
 
-  <div class="row">
-    <input type="text" id="prompt" placeholder="例如: 一隻橘貓坐在沙發上" style="flex:3;min-width:200px">
-    <select id="style" style="flex:1">
-      <option value="">預設</option>
-      <option value="anime">日系動漫</option>
-      <option value="meme">迷因風格</option>
-    </select>
-    <button id="genBtn" onclick="generate()">✨ 生成</button>
-  </div>
+  <input type="text" id="prompt" placeholder="輸入中文，例如：一隻穿著西裝的貓在開會">
+  <button id="genBtn" onclick="generate()">✨ 生成圖片</button>
 
-  <div id="loading" class="show">
-    <div style="margin-bottom:8px">⏳ AI 繪圖中，約 30-60 秒...</div>
-    <div style="font-size:12px;color:#666">（免費服務，模型載入較慢請耐心等待）</div>
+  <div id="loading">
+    <div style="margin-bottom:8px">⏳ Gemini 正在優化提示詞...</div>
   </div>
 
   <div id="result">
-    <div id="canvasWrap"><canvas id="mc"></canvas></div>
-    <div class="meme-inputs">
-      <input type="text" id="topText" placeholder="上層文字" oninput="draw()">
-      <input type="text" id="bottomText" placeholder="下層文字" oninput="draw()">
-    </div>
-    <div class="actions">
-      <button class="btn-dl" onclick="download()">💾 下載迷因圖</button>
-      <button class="btn-retry" onclick="regenerate()">🔄 重新生成</button>
-    </div>
+    <div class="preview-box" id="promptDisplay"></div>
+    <div style="margin-top:12px"><img id="aiImage" src="" alt=""></div>
   </div>
 
-  <div id="error" class="error" style="display:none"></div>
-  <footer>圖片由 Pollinations.ai 免費提供</footer>
+  <div id="error" class="error"></div>
+  <div class="hint">圖片由 Pollinations.ai 提供 | Gemini 翻譯提示詞</div>
 </div>
 
 <script>
-let img = new Image();
-let currentPrompt = '';
-
 async function generate() {
   const prompt = document.getElementById('prompt').value.trim();
-  if (!prompt) { showError('請輸入提示詞'); return; }
-  currentPrompt = prompt;
+  if (!prompt) { showError('請輸入內容'); return; }
 
   document.getElementById('genBtn').disabled = true;
   document.getElementById('loading').classList.add('show');
   document.getElementById('result').classList.remove('show');
   document.getElementById('error').style.display = 'none';
 
-  const style = document.getElementById('style').value;
-  const finalPrompt = style === 'anime' ? prompt + ', Japanese anime style, studio ghibli, high quality' :
-                      style === 'meme'  ? prompt + ', funny meme template, clean illustration' :
-                      prompt;
+  try {
+    const res = await fetch('/optimize-prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
 
-  // Load Pollinations image directly in browser
-  const seed = Math.floor(Math.random() * 99999);
-  img.crossOrigin = 'anonymous';
-  img.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=1024&height=1024&seed=${seed}&nofeed=true`;
+    if (!res.ok) {
+      let msg = '伺服器錯誤';
+      try { const e = await res.json(); msg = e.error || e.detail; } catch(e2) { msg = await res.text(); }
+      throw new Error(msg);
+    }
 
-  img.onload = () => {
+    const data = await res.json();
+    const engPrompt = data.optimized_prompt;
+    document.getElementById('promptDisplay').textContent = '✨ ' + engPrompt;
+
+    document.getElementById('loading').innerHTML = '<div>🚀 提示詞優化完成，載入圖片中...</div>';
+
+    const img = document.getElementById('aiImage');
+    const seed = Math.floor(Math.random() * 99999);
+    img.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(engPrompt)}?width=1024&height=1024&seed=${seed}&nofeed=true`;
+
+    img.onload = () => {
+      document.getElementById('loading').classList.remove('show');
+      document.getElementById('result').classList.add('show');
+      document.getElementById('genBtn').disabled = false;
+    };
+    img.onerror = () => {
+      document.getElementById('loading').classList.remove('show');
+      document.getElementById('result').classList.add('show');
+      img.alt = '圖片載入失敗（Pollinations 速率限制，請稍後再試）';
+      img.style.display = 'none';
+      document.getElementById('error').textContent = '⚠️ Pollinations 免費服務忙碌中，請稍後再試';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('genBtn').disabled = false;
+    };
+  } catch (e) {
     document.getElementById('loading').classList.remove('show');
-    document.getElementById('result').classList.add('show');
     document.getElementById('genBtn').disabled = false;
-    draw();
-  };
-  img.onerror = () => {
-    document.getElementById('loading').classList.remove('show');
-    document.getElementById('genBtn').disabled = false;
-    showError('Pollinations 免費服務目前無法使用，請稍後再試');
-  };
-}
-
-function regenerate() {
-  if (currentPrompt) generate();
-}
-
-function draw() {
-  const canvas = document.getElementById('mc');
-  const ctx = canvas.getContext('2d');
-  canvas.width = img.naturalWidth || 1024;
-  canvas.height = img.naturalHeight || 1024;
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-  const top = document.getElementById('topText').value.toUpperCase();
-  const bottom = document.getElementById('bottomText').value.toUpperCase();
-  const fs = Math.max(20, canvas.width * 0.07);
-  ctx.font = `bold ${fs}px Impact, Arial Black, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = fs * 0.1;
-  ctx.fillStyle = '#fff';
-
-  if (top) {
-    ctx.textBaseline = 'top';
-    const y = canvas.height * 0.05;
-    ctx.lineJoin = 'round';
-    ctx.strokeText(top, canvas.width / 2, y);
-    ctx.fillText(top, canvas.width / 2, y);
+    showError(e.message);
   }
-  if (bottom) {
-    ctx.textBaseline = 'bottom';
-    const y = canvas.height * 0.92;
-    ctx.lineJoin = 'round';
-    ctx.strokeText(bottom, canvas.width / 2, y);
-    ctx.fillText(bottom, canvas.width / 2, y);
-  }
-}
-
-function download() {
-  const canvas = document.getElementById('mc');
-  const link = document.createElement('a');
-  link.download = 'meme.jpg';
-  link.href = canvas.toDataURL('image/jpeg', 0.92);
-  link.click();
 }
 
 function showError(msg) {
@@ -157,9 +106,6 @@ function showError(msg) {
   el.textContent = '❌ ' + msg;
   el.style.display = 'block';
 }
-
-// Start hidden
-document.getElementById('loading').classList.remove('show');
 </script>
 </body>
 </html>
