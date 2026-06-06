@@ -506,6 +506,8 @@ async function generateAI() {
   const provider = document.getElementById('ai-provider').value;
   const apiKey = document.getElementById('ai-api-key').value;
   const count = parseInt(document.getElementById('ai-count').value) || 1;
+  const w = parseInt(document.getElementById('ai-w').value);
+  const h = parseInt(document.getElementById('ai-h').value);
   showLoading(true);
   try {
     const area = document.getElementById('preview-area');
@@ -513,12 +515,26 @@ async function generateAI() {
     link.classList.remove('show');
     area.innerHTML = '';
 
+    // Pollinations (free): call directly from browser to avoid server IP limits
+    if (provider === 'pollinations') {
+      const results = [];
+      for (let i = 0; i < count; i++) {
+        const img = document.createElement('img');
+        img.style.cssText = 'max-width:100%;max-height:350px;border-radius:8px;margin:4px';
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${i}`;
+        img.src = url;
+        area.appendChild(img);
+        results.push(url);
+      }
+      link.href = results[0];
+      link.download = 'ai-image.png';
+      link.classList.add('show');
+      return;
+    }
+
     const body = {
-      prompt: prompt,
-      provider: provider,
-      apiKey: apiKey,
-      width: parseInt(document.getElementById('ai-w').value),
-      height: parseInt(document.getElementById('ai-h').value),
+      prompt: prompt, provider: provider, apiKey: apiKey,
+      width: w, height: h,
     };
     const endpoint = type === 'image' ? '/api/ai-image' : '/api/ai-video';
 
@@ -550,7 +566,7 @@ async function generateAI() {
       if (results.length === 0) { area.innerHTML = '<div class="preview-placeholder">生成失敗</div>'; return; }
       const container = document.createElement('div');
       container.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;justify-content:center';
-      results.forEach((url, i) => {
+      results.forEach((url) => {
         const img = document.createElement('img');
         img.src = url;
         img.style.cssText = 'max-width:100%;max-height:350px;border-radius:8px;flex:1;min-width:200px';
