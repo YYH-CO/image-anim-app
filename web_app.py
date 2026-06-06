@@ -396,27 +396,32 @@ def _gen_replicate_image(prompt, w, h, api_key):
             "Content-Type": "application/json",
         },
         json={"input": {"prompt": prompt, "width": w, "height": h}},
-        timeout=10,
+        timeout=15,
     )
     if resp.status_code != 201:
-        return jsonify({"error": f"Replicate 錯誤: {resp.text[:200]}"}), 502
+        return jsonify({"error": f"Replicate 啟動失敗 ({resp.status_code}): {resp.text[:200]}"}), 502
 
     prediction = resp.json()
     get_url = prediction["urls"]["get"]
 
-    # Poll until complete
     for _ in range(60):
-        http_requests.get("https://api.replicate.com/v1/predictions/" + prediction["id"],
-                          headers={"Authorization": f"Bearer {api_key}"})
         time.sleep(1)
-        status_resp = http_requests.get(get_url, headers={"Authorization": f"Bearer {api_key}"})
+        status_resp = http_requests.get(get_url, headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
+        if status_resp.status_code != 200:
+            continue
         status = status_resp.json()
-        if status["status"] == "succeeded":
-            img_url = status["output"][0]
-            img_resp = http_requests.get(img_url, timeout=30)
-            return send_file(io.BytesIO(img_resp.content), mimetype="image/png")
-        elif status["status"] == "failed":
-            return jsonify({"error": "Replicate 生成失敗"}), 502
+        if status.get("status") == "succeeded":
+            output = status.get("output", [])
+            if not output:
+                return jsonify({"error": "Replicate 輸出為空"}), 502
+            img_url = output[0] if isinstance(output, list) else output
+            if isinstance(img_url, str):
+                img_resp = http_requests.get(img_url, timeout=30)
+                return send_file(io.BytesIO(img_resp.content), mimetype="image/png")
+            return jsonify({"error": f"Replicate 輸出格式異常"}), 502
+        elif status.get("status") == "failed":
+            err = status.get("error", "未知錯誤")
+            return jsonify({"error": f"Replicate 生成失敗: {err}"}), 502
     return jsonify({"error": "Replicate 生成超時"}), 504
 
 
@@ -460,24 +465,32 @@ def _gen_replicate_video(prompt, api_key):
             "Content-Type": "application/json",
         },
         json={"input": {"prompt": prompt}},
-        timeout=10,
+        timeout=15,
     )
     if resp.status_code != 201:
-        return jsonify({"error": f"Replicate 影片錯誤: {resp.text[:200]}"}), 502
+        return jsonify({"error": f"Replicate 影片啟動失敗 ({resp.status_code}): {resp.text[:200]}"}), 502
 
     prediction = resp.json()
     get_url = prediction["urls"]["get"]
 
     for _ in range(120):
         time.sleep(2)
-        status_resp = http_requests.get(get_url, headers={"Authorization": f"Bearer {api_key}"})
+        status_resp = http_requests.get(get_url, headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
+        if status_resp.status_code != 200:
+            continue
         status = status_resp.json()
-        if status["status"] == "succeeded":
-            video_url = status["output"][0]
-            video_resp = http_requests.get(video_url, timeout=60)
-            return send_file(io.BytesIO(video_resp.content), mimetype="video/mp4")
-        elif status["status"] == "failed":
-            return jsonify({"error": "Replicate 影片生成失敗"}), 502
+        if status.get("status") == "succeeded":
+            output = status.get("output", [])
+            if not output:
+                return jsonify({"error": "Replicate 影片輸出為空"}), 502
+            video_url = output[0] if isinstance(output, list) else output
+            if isinstance(video_url, str):
+                video_resp = http_requests.get(video_url, timeout=60)
+                return send_file(io.BytesIO(video_resp.content), mimetype="video/mp4")
+            return jsonify({"error": "Replicate 影片輸出格式異常"}), 502
+        elif status.get("status") == "failed":
+            err = status.get("error", "未知錯誤")
+            return jsonify({"error": f"Replicate 影片生成失敗: {err}"}), 502
     return jsonify({"error": "Replicate 影片生成超時"}), 504
 
 
