@@ -255,7 +255,8 @@
     <label>輸入你的 API Key</label>
     <input type="password" id="ai-api-key" placeholder="貼上你的 API Key">
     <div style="font-size:12px;color:var(--text2);margin-top:6px">
-      🔑 API Key 只存在瀏覽器中，不會被儲存到伺服器
+      🔑 API Key 只存在瀏覽器中，不會被儲存到伺服器<br>
+      💡 Replicate 免費註冊: <a href="https://replicate.com" target="_blank" style="color:var(--accent)">replicate.com</a>
     </div>
   </div>
   <button class="btn" onclick="generateAI()">🤖 AI 生成</button>
@@ -519,11 +520,17 @@ async function generateAI() {
     if (provider === 'pollinations') {
       const results = [];
       for (let i = 0; i < count; i++) {
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'text-align:center;width:100%';
         const img = document.createElement('img');
         img.style.cssText = 'max-width:100%;max-height:350px;border-radius:8px;margin:4px';
         const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${i}`;
+        img.onerror = function() {
+          wrapper.innerHTML = '<div style="padding:20px;color:var(--text2);font-size:14px">⚠️ Pollinations 暫時無法使用<br>請改用 <strong>Replicate</strong> 並貼上 API Key</div>';
+        };
         img.src = url;
-        area.appendChild(img);
+        wrapper.appendChild(img);
+        area.appendChild(wrapper);
         results.push(url);
       }
       link.href = results[0];
