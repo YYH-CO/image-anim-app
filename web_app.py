@@ -1,5 +1,5 @@
 import os, requests
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 
 app = Flask(__name__)
 
@@ -12,7 +12,7 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 @app.route("/")
 def index():
-    return render_template("index.html", poll_key=POLLINATIONS_KEY)
+    return render_template("index.html")
 
 
 @app.route("/optimize-prompt", methods=["POST"])
@@ -45,7 +45,6 @@ def optimize_prompt():
     try:
         resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=20)
         if resp.status_code != 200:
-            print(f"Groq Error: {resp.text}")
             return jsonify({"error": f"Groq 連線失敗 ({resp.status_code})"}), 502
         result = resp.json()
         text = result["choices"][0]["message"]["content"].strip()
@@ -54,6 +53,26 @@ def optimize_prompt():
         return jsonify({"optimized_prompt": text})
     except Exception as e:
         return jsonify({"error": f"連線異常: {str(e)[:200]}"}), 502
+
+
+@app.route("/generate-image")
+def generate_image():
+    eng_prompt = request.args.get("prompt", "")
+    seed = request.args.get("seed", "42")
+    if not eng_prompt:
+        return "Missing prompt", 400
+
+    poll_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}?width=1024&height=1024&seed={seed}&nofeed=true&model=flux"
+    if POLLINATIONS_KEY:
+        poll_url += f"&key={POLLINATIONS_KEY}"
+
+    try:
+        resp = requests.get(poll_url, timeout=60)
+        if resp.status_code != 200:
+            return jsonify({"error": f"Pollinations {resp.status_code}"}), 502
+        return Response(resp.content, mimetype="image/jpeg")
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 502
 
 
 if __name__ == "__main__":

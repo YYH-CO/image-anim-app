@@ -74,14 +74,11 @@ async function generate() {
     const engPrompt = data.optimized_prompt;
     document.getElementById('promptDisplay').textContent = '✨ ' + engPrompt;
 
-    document.getElementById('loading').innerHTML = '<div>🚀 提示詞優化完成，載入圖片中...</div>';
+    document.getElementById('loading').innerHTML = '<div>🚀 後端 Proxy 載入圖片中...</div>';
 
     const img = document.getElementById('aiImage');
     const seed = Math.floor(Math.random() * 99999);
-    const pollKey = '{{ poll_key }}';
-    let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(engPrompt)}?width=1024&height=1024&seed=${seed}&nofeed=true&model=flux`;
-    if (pollKey) url += `&key=${pollKey}`;
-    img.src = url;
+    img.src = `/generate-image?prompt=${encodeURIComponent(engPrompt)}&seed=${seed}`;
 
     img.onload = () => {
       document.getElementById('loading').classList.remove('show');
