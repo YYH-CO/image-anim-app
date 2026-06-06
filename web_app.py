@@ -311,42 +311,49 @@ def _rotate_text(text, w, h, font, bg, fg, n):
 
 MAX_RETRIES = 3
 
+@app.route("/health")
+def health():
+    return "ok"
+
 @app.route("/api/ai-image", methods=["POST"])
 def api_ai_image():
-    data = request.get_json(force=True)
-    prompt = data.get("prompt", "")
-    if not prompt:
-        return jsonify({"error": "請輸入描述"}), 400
+    try:
+        data = request.get_json(force=True)
+        prompt = data.get("prompt", "")
+        if not prompt:
+            return jsonify({"error": "請輸入描述"}), 400
 
-    translated = _translate_to_english(prompt)
-    if translated != prompt:
-        prompt = translated
+        translated = _translate_to_english(prompt)
+        if translated != prompt:
+            prompt = translated
 
-    provider = data.get("provider", "pollinations")
-    api_key = data.get("apiKey", "")
-    w = int(data.get("width", 1024))
-    h = int(data.get("height", 1024))
-    seed = data.get("seed")
+        provider = data.get("provider", "pollinations")
+        api_key = data.get("apiKey", "")
+        w = int(data.get("width", 1024))
+        h = int(data.get("height", 1024))
+        seed = data.get("seed")
 
-    last_error = ""
-    for attempt in range(MAX_RETRIES):
-        try:
-            if provider == "openai":
-                return _gen_openai_image(prompt, w, h, api_key)
-            elif provider == "replicate":
-                return _gen_replicate_image(prompt, w, h, api_key)
-            elif provider == "gemini":
-                return _gen_gemini_image(prompt, api_key)
-            elif provider == "huggingface":
-                return _gen_huggingface_image(prompt, w, h, api_key)
-            else:
-                return _gen_pollinations_image(prompt, w, h, seed)
-        except Exception as e:
-            last_error = str(e)
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(1)
+        last_error = ""
+        for attempt in range(MAX_RETRIES):
+            try:
+                if provider == "openai":
+                    return _gen_openai_image(prompt, w, h, api_key)
+                elif provider == "replicate":
+                    return _gen_replicate_image(prompt, w, h, api_key)
+                elif provider == "gemini":
+                    return _gen_gemini_image(prompt, api_key)
+                elif provider == "huggingface":
+                    return _gen_huggingface_image(prompt, w, h, api_key)
+                else:
+                    return _gen_pollinations_image(prompt, w, h, seed)
+            except Exception as e:
+                last_error = str(e)
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(1)
 
-    return _gen_placeholder_image(prompt, w, h, last_error)
+        return _gen_placeholder_image(prompt, w, h, last_error)
+    except Exception as e:
+        return jsonify({"error": f"伺服器內部錯誤: {str(e)[:200]}"}), 500
 
 
 def _gen_pollinations_image(prompt, w, h, seed=None):
