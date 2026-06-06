@@ -287,6 +287,7 @@ def api_ai_image():
     api_key = data.get("apiKey", "")
     w = int(data.get("width", 1024))
     h = int(data.get("height", 1024))
+    seed = data.get("seed")
 
     last_error = ""
     for attempt in range(MAX_RETRIES):
@@ -296,7 +297,7 @@ def api_ai_image():
             elif provider == "replicate":
                 return _gen_replicate_image(prompt, w, h, api_key)
             else:
-                return _gen_pollinations_image(prompt, w, h)
+                return _gen_pollinations_image(prompt, w, h, seed)
         except Exception as e:
             last_error = str(e)
             if attempt < MAX_RETRIES - 1:
@@ -305,10 +306,11 @@ def api_ai_image():
     return _gen_placeholder_image(prompt, w, h, last_error)
 
 
-def _gen_pollinations_image(prompt, w, h):
+def _gen_pollinations_image(prompt, w, h, seed=None):
+    prompt_encoded = urllib.parse.quote(prompt)
     urls = [
-        f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}",
-        f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?nofeed=true",
+        f"https://image.pollinations.ai/prompt/{prompt_encoded}{'?seed='+str(seed) if seed is not None else ''}",
+        f"https://image.pollinations.ai/prompt/{prompt_encoded}?nofeed=true{'&seed='+str(seed) if seed is not None else ''}",
     ]
     for url in urls:
         resp = http_requests.get(url, timeout=90)

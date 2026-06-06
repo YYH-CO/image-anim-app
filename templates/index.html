@@ -244,6 +244,10 @@
         <label>高度</label>
         <input type="number" id="ai-h" value="1024" min="256" max="2048" step="64">
       </div>
+      <div>
+        <label>生成張數</label>
+        <input type="number" id="ai-count" value="1" min="1" max="4">
+      </div>
     </div>
   </div>
   <div class="card" id="ai-key-card" style="display:none">
@@ -501,8 +505,14 @@ async function generateAI() {
   const type = document.getElementById('ai-type').value;
   const provider = document.getElementById('ai-provider').value;
   const apiKey = document.getElementById('ai-api-key').value;
+  const count = parseInt(document.getElementById('ai-count').value) || 1;
   showLoading(true);
   try {
+    const area = document.getElementById('preview-area');
+    const link = document.getElementById('download-link');
+    link.classList.remove('show');
+    area.innerHTML = '';
+
     const body = {
       prompt: prompt,
       provider: provider,
@@ -511,21 +521,46 @@ async function generateAI() {
       height: parseInt(document.getElementById('ai-h').value),
     };
     const endpoint = type === 'image' ? '/api/ai-image' : '/api/ai-video';
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) {
-      let msg = '生成失敗';
-      try { const e = await res.json(); msg = e.error || msg; } catch(e2) {}
-      alert(msg);
-      return;
+
+    if (type === 'video') {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch(e2) {} alert(msg || '生成失敗'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      area.innerHTML = `<video src="${url}" autoplay loop controls style="max-width:100%;max-height:400px"></video>`;
+      link.href = url;
+      link.download = 'ai-video.mp4';
+      link.classList.add('show');
+    } else {
+      const results = [];
+      for (let i = 0; i < count; i++) {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...body, seed: i })
+        });
+        if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch(e2) {} alert(msg || `第 ${i+1} 張生成失敗`); continue; }
+        const blob = await res.blob();
+        results.push(URL.createObjectURL(blob));
+      }
+      if (results.length === 0) { area.innerHTML = '<div class="preview-placeholder">生成失敗</div>'; return; }
+      const container = document.createElement('div');
+      container.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;justify-content:center';
+      results.forEach((url, i) => {
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.cssText = 'max-width:100%;max-height:350px;border-radius:8px;flex:1;min-width:200px';
+        container.appendChild(img);
+      });
+      area.appendChild(container);
+      link.href = results[0];
+      link.download = 'ai-image.png';
+      link.classList.add('show');
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const ext = type === 'video' ? '.mp4' : '.png';
-    showResult(url, 'ai-result' + ext);
   } catch(e) { alert('生成失敗: ' + e.message); }
   finally { showLoading(false); }
 }
