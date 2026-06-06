@@ -230,8 +230,9 @@
         <label>提供者</label>
         <select id="ai-provider">
           <option value="replicate">Replicate (推薦)</option>
+          <option value="huggingface">Hugging Face (免費)</option>
           <option value="gemini">Gemini (免費)</option>
-          <option value="pollinations">Pollinations (免費，常無法使用)</option>
+          <option value="pollinations">Pollinations (免費)</option>
           <option value="openai">OpenAI DALL-E 3 (需 API Key)</option>
         </select>
       </div>
@@ -393,8 +394,9 @@
 // ─── AI type / provider toggle ───
 document.getElementById('ai-type').addEventListener('change', function() {});
 document.getElementById('ai-provider').addEventListener('change', function() {
+  const needsKey = ['replicate', 'openai', 'gemini'];
   document.getElementById('ai-key-card').style.display =
-    this.value === 'pollinations' ? 'none' : '';
+    needsKey.includes(this.value) ? '' : 'none';
 });
 
 // ─── Tab switching ───
