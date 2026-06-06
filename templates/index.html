@@ -258,8 +258,9 @@
     <input type="password" id="ai-api-key" placeholder="貼上你的 API Key">
     <div style="font-size:12px;color:var(--text2);margin-top:6px">
       🔑 API Key 只存在瀏覽器中，不會被儲存到伺服器<br>
-      💡 Replicate 免費註冊: <a href="https://replicate.com" target="_blank" style="color:var(--accent)">replicate.com</a><br>
-      💡 Gemini 免費 Key: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a>
+      💡 Replicate: <a href="https://replicate.com" target="_blank" style="color:var(--accent)">replicate.com</a><br>
+      💡 Gemini: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a><br>
+      💡 Hugging Face: <a href="https://huggingface.co/settings/tokens" target="_blank" style="color:var(--accent)">huggingface.co/settings/tokens</a>
     </div>
   </div>
   <button class="btn" onclick="generateAI()">🤖 AI 生成</button>
@@ -394,7 +395,7 @@
 // ─── AI type / provider toggle ───
 document.getElementById('ai-type').addEventListener('change', function() {});
 document.getElementById('ai-provider').addEventListener('change', function() {
-  const needsKey = ['replicate', 'openai', 'gemini'];
+  const needsKey = ['replicate', 'openai', 'gemini', 'huggingface'];
   document.getElementById('ai-key-card').style.display =
     needsKey.includes(this.value) ? '' : 'none';
 });
