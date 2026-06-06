@@ -71,31 +71,31 @@ def generate_image():
     if HF_TOKEN:
         headers = {
             "Authorization": f"Bearer {HF_TOKEN}",
-            "Content-Type": "application/json",
         }
-        payload = {
-            "inputs": eng_prompt,
-            "parameters": {
-                "negative_prompt": "blurry, bad quality, distorted",
-                "width": 1024,
-                "height": 1024,
-                "seed": int(seed),
-            },
-        }
-        try:
-            print(f"HF request: {HF_MODEL}")
-            resp = requests.post(
-                f"https://api-inference.huggingface.co/models/{HF_MODEL}",
-                json=payload,
-                headers=headers,
-                timeout=60,
-            )
-            if resp.status_code == 200:
-                print(f"HF success: {len(resp.content)} bytes")
-                return Response(resp.content, mimetype="image/jpeg")
-            print(f"HF failed: HTTP {resp.status_code}, {resp.text[:200]}")
-        except Exception as e:
-            print(f"HF exception: {e}")
+        payload = {"inputs": eng_prompt}
+        models_to_try = [
+            HF_MODEL,
+            "runwayml/stable-diffusion-v1-5",
+            "stabilityai/stable-diffusion-2-1",
+        ]
+        for model in models_to_try:
+            try:
+                print(f"HF request: {model}")
+                resp = requests.post(
+                    f"https://api-inference.huggingface.co/models/{model}",
+                    json=payload,
+                    headers=headers,
+                    timeout=90,
+                )
+                if resp.status_code == 200:
+                    ct = resp.headers.get("Content-Type", "")
+                    if "image" in ct or len(resp.content) > 1000:
+                        print(f"HF success: {model}, {len(resp.content)} bytes")
+                        return Response(resp.content, mimetype=ct if "image" in ct else "image/jpeg")
+                err = resp.text[:300] if resp.text else f"HTTP {resp.status_code}"
+                print(f"  -> Failed: {err}")
+            except Exception as e:
+                print(f"  -> Exception: {e}")
     else:
         print("No HF_TOKEN configured")
 
