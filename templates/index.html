@@ -562,7 +562,14 @@ async function generateAI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch(e2) {} showError(msg || '生成失敗'); return; }
+      if (!res.ok) {
+        let msg = `伺服器錯誤 (${res.status})`;
+        try { const e = await res.json(); if (e.error) msg = e.error; } catch(e2) {
+          try { msg = await res.text(); } catch(e3) {}
+        }
+        showError(msg);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       area.innerHTML = `<video src="${url}" autoplay loop controls style="max-width:100%;max-height:400px"></video>`;
@@ -577,7 +584,14 @@ async function generateAI() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...body, seed: i })
         });
-        if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch(e2) {} showError(msg || `第 ${i+1} 張生成失敗`); continue; }
+        if (!res.ok) {
+          let msg = `伺服器錯誤 (${res.status})`;
+          try { const e = await res.json(); if (e.error) msg = e.error; } catch(e2) {
+            try { msg = await res.text(); } catch(e3) {}
+          }
+          showError(msg);
+          continue;
+        }
         const blob = await res.blob();
         results.push(URL.createObjectURL(blob));
       }

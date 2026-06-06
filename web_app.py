@@ -26,7 +26,7 @@ def _translate_to_english(text):
         resp = http_requests.post(
             "https://libretranslate.com/translate",
             json={"q": text, "source": "zh", "target": "en"},
-            timeout=10,
+            timeout=5,
         )
         if resp.status_code == 200:
             return resp.json().get("translatedText", text)
@@ -37,7 +37,7 @@ def _translate_to_english(text):
         resp = http_requests.get(
             f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh&tl=en&dt=t&q={urllib.parse.quote(text)}",
             headers={"User-Agent": "Mozilla/5.0"},
-            timeout=10,
+            timeout=5,
         )
         if resp.status_code == 200:
             data = resp.json()
@@ -467,7 +467,7 @@ def _gen_huggingface_image(prompt, w, h, api_key=""):
             f"https://api-inference.huggingface.co/models/{model}",
             headers=headers,
             json={"inputs": prompt},
-            timeout=30,
+            timeout=25,
         )
         if resp.status_code == 200:
             return send_file(io.BytesIO(resp.content), mimetype="image/png")
