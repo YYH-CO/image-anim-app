@@ -78,7 +78,10 @@ async function generate() {
 
     const img = document.getElementById('aiImage');
     const seed = Math.floor(Math.random() * 99999);
-    img.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(engPrompt)}?width=1024&height=1024&seed=${seed}&nofeed=true`;
+    const pollKey = '{{ poll_key }}';
+    let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(engPrompt)}?width=1024&height=1024&seed=${seed}&nofeed=true&model=flux`;
+    if (pollKey) url += `&key=${pollKey}`;
+    img.src = url;
 
     img.onload = () => {
       document.getElementById('loading').classList.remove('show');

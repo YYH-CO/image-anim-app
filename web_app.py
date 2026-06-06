@@ -5,13 +5,14 @@ app = Flask(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 SHARE_CODE = os.getenv("SHARE_CODE", "").strip()
+POLLINATIONS_KEY = os.getenv("POLLINATIONS_KEY", "").strip()
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", poll_key=POLLINATIONS_KEY)
 
 
 @app.route("/optimize-prompt", methods=["POST"])
