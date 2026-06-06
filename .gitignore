@@ -1,0 +1,6 @@
+*.pyc
+__pycache__/
+.env
+*.ttc
+*.otf
+.DS_Store
