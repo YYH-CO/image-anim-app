@@ -1,5 +1,5 @@
 import os, requests
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 
 app = Flask(__name__)
 
@@ -45,6 +45,7 @@ def optimize_prompt():
     try:
         resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=20)
         if resp.status_code != 200:
+            print(f"Groq Error: {resp.text}")
             return jsonify({"error": f"Groq 連線失敗 ({resp.status_code})"}), 502
         result = resp.json()
         text = result["choices"][0]["message"]["content"].strip()
@@ -66,13 +67,19 @@ def generate_image():
     if POLLINATIONS_KEY:
         poll_url += f"&key={POLLINATIONS_KEY}"
 
-    try:
-        resp = requests.get(poll_url, timeout=60)
-        if resp.status_code != 200:
-            return jsonify({"error": f"Pollinations {resp.status_code}"}), 502
-        return Response(resp.content, mimetype="image/jpeg")
-    except Exception as e:
-        return jsonify({"error": str(e)[:200]}), 502
+    def proxy_stream():
+        try:
+            resp = requests.get(poll_url, stream=True, timeout=60)
+            if resp.status_code != 200:
+                yield f"Error {resp.status_code}".encode()
+                return
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        except Exception as e:
+            yield f"Proxy error: {str(e)[:100]}".encode()
+
+    return Response(stream_with_context(proxy_stream()), mimetype="image/jpeg")
 
 
 if __name__ == "__main__":
