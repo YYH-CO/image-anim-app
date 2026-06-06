@@ -29,13 +29,13 @@ button:disabled { opacity: 0.5; cursor: default; }
 <body>
 <div class="card">
   <h1>🎨 AI 圖片生成器</h1>
-  <p class="sub">中文輸入 → Gemini 翻譯 → Pollinations 繪圖</p>
+  <p class="sub">中文輸入 → AI 翻譯 → 自動繪圖（備用模式）</p>
 
   <input type="text" id="prompt" placeholder="輸入中文，例如：一隻穿著西裝的貓在開會">
   <button id="genBtn" onclick="generate()">✨ 生成圖片</button>
 
   <div id="loading">
-    <div style="margin-bottom:8px">⏳ Gemini 正在優化提示詞...</div>
+    <div style="margin-bottom:8px">⏳ AI 正在優化提示詞...</div>
   </div>
 
   <div id="result">
@@ -44,7 +44,7 @@ button:disabled { opacity: 0.5; cursor: default; }
   </div>
 
   <div id="error" class="error"></div>
-  <div class="hint">圖片由 Pollinations.ai 提供 | Gemini 翻譯提示詞</div>
+  <div class="hint">提示詞由 Groq AI 優化 | 圖片由 Pillow 產生</div>
 </div>
 
 <script>
@@ -74,37 +74,26 @@ async function generate() {
     const engPrompt = data.optimized_prompt;
     document.getElementById('promptDisplay').textContent = '✨ ' + engPrompt;
 
-    document.getElementById('loading').innerHTML = '<div>🚀 後端 Proxy 載入圖片中...</div>';
+    document.getElementById('loading').innerHTML = '<div>🚀 產生圖片中...</div>';
 
     const img = document.getElementById('aiImage');
     const seed = Math.floor(Math.random() * 99999);
 
-    try {
-      const res = await fetch(`/generate-image?prompt=${encodeURIComponent(engPrompt)}&seed=${seed}`);
-      if (!res.ok) {
-        let msg = 'Pollinations 錯誤';
-        try { const e = await res.json(); msg = e.error; } catch(e2) { msg = await res.text(); }
-        throw new Error(msg);
-      }
-      const blob = await res.blob();
-      img.src = URL.createObjectURL(blob);
+    img.onload = () => {
       document.getElementById('loading').classList.remove('show');
       document.getElementById('result').classList.add('show');
       document.getElementById('genBtn').disabled = false;
-    } catch (e) {
-      document.getElementById('loading').classList.remove('show');
-      document.getElementById('genBtn').disabled = false;
-      showError(e.message);
-    }
+    };
+
     img.onerror = () => {
       document.getElementById('loading').classList.remove('show');
       document.getElementById('result').classList.add('show');
-      img.alt = '圖片載入失敗（Pollinations 速率限制，請稍後再試）';
-      img.style.display = 'none';
-      document.getElementById('error').textContent = '⚠️ Pollinations 免費服務忙碌中，請稍後再試';
-      document.getElementById('error').style.display = 'block';
       document.getElementById('genBtn').disabled = false;
+      document.getElementById('error').textContent = '⚠️ 圖片產生失敗，請稍後再試';
+      document.getElementById('error').style.display = 'block';
     };
+
+    img.src = `/generate-image?prompt=${encodeURIComponent(engPrompt)}&seed=${seed}`;
   } catch (e) {
     document.getElementById('loading').classList.remove('show');
     document.getElementById('genBtn').disabled = false;
