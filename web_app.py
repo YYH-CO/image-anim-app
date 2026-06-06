@@ -3,10 +3,10 @@ from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 SHARE_CODE = os.getenv("SHARE_CODE", "").strip()
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
 @app.route("/")
@@ -17,8 +17,8 @@ def index():
 @app.route("/optimize-prompt", methods=["POST"])
 def optimize_prompt():
     data = request.get_json(force=True)
-    if not GEMINI_API_KEY:
-        return jsonify({"error": "伺服器未設定 GEMINI_API_KEY"}), 500
+    if not GROQ_API_KEY:
+        return jsonify({"error": "伺服器未設定 GROQ_API_KEY"}), 500
     if SHARE_CODE and data.get("code") != SHARE_CODE:
         return jsonify({"error": "共享密碼錯誤"}), 403
 
@@ -26,36 +26,31 @@ def optimize_prompt():
     if not prompt:
         return jsonify({"error": "請輸入內容"}), 400
 
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
     payload = {
-        "contents": [{
-            "parts": [{
-                "text": "You are a prompt engineer. Translate and expand the following user request into a detailed, cinematic English prompt for AI image generation. Output ONLY the final prompt text, nothing else. Request: " + prompt
-            }]
-        }]
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are an expert AI image prompt engineer. Translate the user input into English and expand it into a highly descriptive, vivid, detailed prompt for image generation. Output ONLY the raw final expanded prompt text. No explanations, markdown, or chat text."
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.7,
     }
     try:
-        resp = requests.post(
-            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=30,
-        )
+        resp = requests.post(GROQ_URL, json=payload, headers=headers, timeout=20)
         if resp.status_code != 200:
-            print(f"Gemini API Error: {resp.text}")
-            try:
-                body = resp.json()
-                detail = body.get("error", {}).get("message", resp.text[:100])
-            except Exception:
-                detail = resp.text[:100]
-            return jsonify({"error": f"Gemini 錯誤: {detail}"}), 502
-
+            print(f"Groq Error: {resp.text}")
+            return jsonify({"error": f"Groq 連線失敗 ({resp.status_code})"}), 502
         result = resp.json()
-        candidates = result.get("candidates", [])
-        if not candidates:
-            return jsonify({"error": "Gemini 安全審查攔截，請修改提示詞"}), 422
-        text = candidates[0]["content"]["parts"][0]["text"].strip()
+        text = result["choices"][0]["message"]["content"].strip()
+        if text.startswith('"') and text.endswith('"'):
+            text = text[1:-1].strip()
         return jsonify({"optimized_prompt": text})
-
     except Exception as e:
         return jsonify({"error": f"連線異常: {str(e)[:200]}"}), 502
 
