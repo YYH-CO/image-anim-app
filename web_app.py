@@ -12,6 +12,41 @@ from PIL import Image, ImageDraw, ImageFont, ImageSequence
 app = Flask(__name__)
 
 
+def _is_chinese(text):
+    for ch in text:
+        if '\u4e00' <= ch <= '\u9fff':
+            return True
+    return False
+
+
+def _translate_to_english(text):
+    if not _is_chinese(text):
+        return text
+    try:
+        resp = http_requests.post(
+            "https://libretranslate.com/translate",
+            json={"q": text, "source": "zh", "target": "en"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return resp.json().get("translatedText", text)
+    except Exception:
+        pass
+    # Fallback: try Google Translate
+    try:
+        resp = http_requests.get(
+            f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh&tl=en&dt=t&q={urllib.parse.quote(text)}",
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return "".join([part[0] for part in data[0] if part[0]])
+    except Exception:
+        pass
+    return text
+
+
 def _get_font(size):
     paths = [
         "/System/Library/Fonts/Helvetica.ttc",
@@ -282,6 +317,10 @@ def api_ai_image():
     prompt = data.get("prompt", "")
     if not prompt:
         return jsonify({"error": "請輸入描述"}), 400
+
+    translated = _translate_to_english(prompt)
+    if translated != prompt:
+        prompt = translated
 
     provider = data.get("provider", "pollinations")
     api_key = data.get("apiKey", "")
