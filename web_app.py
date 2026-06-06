@@ -3,8 +3,8 @@ from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-SHARE_CODE = os.getenv("SHARE_CODE", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+SHARE_CODE = os.getenv("SHARE_CODE", "").strip()
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
@@ -37,15 +37,27 @@ def optimize_prompt():
         resp = requests.post(
             f"{GEMINI_URL}?key={GEMINI_API_KEY}",
             json=payload,
+            headers={"Content-Type": "application/json"},
             timeout=30,
         )
         if resp.status_code != 200:
-            return jsonify({"error": f"Gemini 錯誤 ({resp.status_code})"}), 502
+            print(f"Gemini API Error: {resp.text}")
+            try:
+                body = resp.json()
+                detail = body.get("error", {}).get("message", resp.text[:100])
+            except Exception:
+                detail = resp.text[:100]
+            return jsonify({"error": f"Gemini 錯誤: {detail}"}), 502
+
         result = resp.json()
-        text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+        candidates = result.get("candidates", [])
+        if not candidates:
+            return jsonify({"error": "Gemini 安全審查攔截，請修改提示詞"}), 422
+        text = candidates[0]["content"]["parts"][0]["text"].strip()
         return jsonify({"optimized_prompt": text})
+
     except Exception as e:
-        return jsonify({"error": str(e)[:200]}), 502
+        return jsonify({"error": f"連線異常: {str(e)[:200]}"}), 502
 
 
 if __name__ == "__main__":
