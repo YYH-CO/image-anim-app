@@ -274,6 +274,8 @@ def _rotate_text(text, w, h, font, bg, fg, n):
 
 # ─── AI Image Generation ───────────────────────────────────
 
+MAX_RETRIES = 3
+
 @app.route("/api/ai-image", methods=["POST"])
 def api_ai_image():
     data = request.get_json(force=True)
@@ -286,36 +288,76 @@ def api_ai_image():
     w = int(data.get("width", 1024))
     h = int(data.get("height", 1024))
 
-    try:
-        if provider == "openai":
-            return _gen_openai_image(prompt, w, h, api_key)
-        elif provider == "replicate":
-            return _gen_replicate_image(prompt, w, h, api_key)
-        else:
-            return _gen_pollinations_image(prompt, w, h)
-    except Exception as e:
-        return jsonify({"error": f"生成失敗: {str(e)}"}), 502
+    last_error = ""
+    for attempt in range(MAX_RETRIES):
+        try:
+            if provider == "openai":
+                return _gen_openai_image(prompt, w, h, api_key)
+            elif provider == "replicate":
+                return _gen_replicate_image(prompt, w, h, api_key)
+            else:
+                return _gen_pollinations_image(prompt, w, h)
+        except Exception as e:
+            last_error = str(e)
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(1)
+
+    return _gen_placeholder_image(prompt, w, h, last_error)
 
 
 def _gen_pollinations_image(prompt, w, h):
-    # Try different URL formats for better reliability
     urls = [
         f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}",
         f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?nofeed=true",
     ]
     for url in urls:
-        try:
-            resp = http_requests.get(url, timeout=60)
-            if resp.status_code == 200:
-                return send_file(
-                    io.BytesIO(resp.content),
-                    mimetype=resp.headers.get("Content-Type", "image/png"),
-                )
-        except Exception:
-            continue
-    return jsonify({
-        "error": "Pollinations 生成失敗（伺服器端限制），請更換提供者或使用 API Key"
-    }), 502
+        resp = http_requests.get(url, timeout=90)
+        if resp.status_code == 200:
+            return send_file(
+                io.BytesIO(resp.content),
+                mimetype=resp.headers.get("Content-Type", "image/png"),
+            )
+        elif resp.status_code == 402:
+            raise Exception("Pollinations 佇列已滿，請稍後再試")
+    raise Exception("Pollinations 無法生成圖片")
+
+
+def _gen_placeholder_image(prompt, w, h, error_msg):
+    """Fallback: generate a styled image with the prompt text when AI fails."""
+    img = Image.new("RGBA", (min(w, 800), min(h, 600)), (26, 26, 46, 255))
+    draw = ImageDraw.Draw(img)
+    font = _get_font(32)
+    font_small = _get_font(18)
+
+    # Draw prompt text centered
+    lines = []
+    line = ""
+    for word in prompt:
+        test = f"{line}{word}"
+        bbox = draw.textbbox((0, 0), test, font=font)
+        if bbox[2] - bbox[0] > img.width - 60:
+            lines.append(line)
+            line = word
+        else:
+            line = test
+    if line:
+        lines.append(line)
+
+    total_h = len(lines) * 50
+    y_start = (img.height - total_h) // 2
+    for i, l in enumerate(lines):
+        bbox = draw.textbbox((0, 0), l, font=font)
+        x = (img.width - (bbox[2] - bbox[0])) // 2
+        draw.text((x, y_start + i * 50), l, font=font, fill=(233, 69, 96, 255))
+
+    # Draw hint text
+    hint = "✨ AI 生成暫時無法使用，請到設定中輸入 API Key"
+    bbox = draw.textbbox((0, 0), hint, font=font_small)
+    x = (img.width - (bbox[2] - bbox[0])) // 2
+    draw.text((x, img.height - 50), hint, font=font_small, fill=(170, 170, 170, 255))
+
+    buf = _pil_to_bytes(img)
+    return send_file(buf, mimetype="image/png")
 
 
 def _gen_openai_image(prompt, w, h, api_key):
