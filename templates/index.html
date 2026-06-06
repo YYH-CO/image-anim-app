@@ -3,615 +3,163 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>圖片動畫生成器</title>
+<title>AI 迷因生圖室</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #1a1a2e;
-    --surface: #16213e;
-    --surface2: #0f3460;
-    --accent: #e94560;
-    --text: #eee;
-    --text2: #aaa;
-    --radius: 12px;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
-  .header {
-    background: var(--surface);
-    padding: 16px;
-    text-align: center;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    border-bottom: 2px solid var(--accent);
-  }
-  .tabs {
-    display: flex;
-    background: var(--surface);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-  .tab-btn {
-    flex: 1;
-    padding: 14px 8px;
-    border: none;
-    background: transparent;
-    color: var(--text2);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    border-bottom: 3px solid transparent;
-  }
-  .tab-btn.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-    background: rgba(233, 69, 96, 0.08);
-  }
-  .tab-content { display: none; padding: 16px; max-width: 700px; margin: 0 auto; }
-  .tab-content.active { display: block; }
-
-  .card {
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 16px;
-    margin-bottom: 16px;
-  }
-  .card-title {
-    font-size: 13px;
-    color: var(--text2);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 12px;
-  }
-  .row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .row > * { flex: 1; min-width: 120px; }
-
-  label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 4px; }
-  input[type="text"], input[type="number"], select, textarea {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #333;
-    border-radius: 8px;
-    background: var(--bg);
-    color: var(--text);
-    font-size: 15px;
-    outline: none;
-    transition: border 0.2s;
-  }
-  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-  textarea { resize: vertical; font-family: inherit; }
-
-  input[type="color"] {
-    width: 48px;
-    height: 48px;
-    border: 2px solid #333;
-    border-radius: 8px;
-    cursor: pointer;
-    background: none;
-    padding: 2px;
-  }
-  input[type="file"] { display: none; }
-  .file-btn {
-    display: inline-block;
-    padding: 10px 16px;
-    background: var(--surface2);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    text-align: center;
-    transition: background 0.2s;
-  }
-  .file-btn:hover { background: var(--accent); }
-  .file-name { font-size: 12px; color: var(--text2); margin-top: 4px; }
-
-  .btn {
-    width: 100%;
-    padding: 14px;
-    border: none;
-    border-radius: var(--radius);
-    background: var(--accent);
-    color: #fff;
-    font-size: 16px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: opacity 0.2s;
-    margin-top: 8px;
-  }
-  .btn:hover { opacity: 0.85; }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-secondary {
-    background: var(--surface2);
-    margin-top: 0;
-  }
-
-  .preview-box {
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 16px;
-    margin-bottom: 16px;
-  }
-  .preview-box .card-title { margin-bottom: 8px; }
-  #preview-area {
-    background: #111;
-    border-radius: 8px;
-    min-height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    position: relative;
-  }
-  #preview-area img, #preview-area video {
-    max-width: 100%;
-    max-height: 400px;
-    display: block;
-  }
-  .preview-placeholder {
-    color: var(--text2);
-    font-size: 14px;
-    padding: 40px;
-    text-align: center;
-  }
-
-  .loading { display: none; }
-  .loading.show { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 20px; }
-  .spinner {
-    width: 20px; height: 20px;
-    border: 3px solid var(--text2);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .download-btn {
-    display: none;
-    width: 100%;
-    padding: 12px;
-    border: 2px solid var(--accent);
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--accent);
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: center;
-    text-decoration: none;
-    margin-top: 10px;
-    transition: all 0.2s;
-  }
-  .download-btn.show { display: block; }
-  .download-btn:hover { background: var(--accent); color: #fff; }
-
-  .color-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-  .color-row label { margin-bottom: 0; }
-
-  @media (max-width: 480px) {
-    .header { font-size: 17px; padding: 12px; }
-    .tab-btn { font-size: 12px; padding: 12px 4px; }
-    .tab-content { padding: 10px; }
-    .card { padding: 12px; }
-  }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, "Segoe UI", Helvetica, sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.card { background: #1a1a2e; max-width: 700px; width: 100%; padding: 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+h1 { font-size: 24px; text-align: center; margin-bottom: 4px; }
+.sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 120px; }
+input, select, button { padding: 12px 14px; font-size: 15px; border-radius: 8px; border: 1px solid #333; background: #16213e; color: #eee; outline: none; }
+input:focus, select:focus { border-color: #4a9eff; }
+button { background: #4a9eff; color: #fff; font-weight: 600; cursor: pointer; border: none; }
+button:hover { background: #3a8aee; }
+button:disabled { opacity: 0.5; cursor: default; }
+#loading { display: none; text-align: center; padding: 30px; color: #888; font-size: 14px; }
+#loading.show { display: block; }
+#result { display: none; margin-top: 16px; }
+#result.show { display: block; }
+#canvasWrap { position: relative; margin-top: 12px; border-radius: 12px; overflow: hidden; background: #111; }
+canvas { width: 100%; display: block; background: #111; }
+.meme-inputs { display: flex; gap: 8px; margin-top: 12px; }
+.meme-inputs input { flex: 1; font-size: 14px; padding: 10px 12px; }
+.actions { display: flex; gap: 8px; margin-top: 12px; }
+.actions button { flex: 1; }
+.btn-dl { background: #22c55e; }
+.btn-dl:hover { background: #16a34a; }
+.btn-retry { background: #666; }
+.btn-retry:hover { background: #555; }
+.error { color: #ff6b6b; text-align: center; padding: 20px; font-size: 14px; }
+footer { text-align: center; margin-top: 16px; color: #555; font-size: 12px; }
 </style>
 </head>
 <body>
+<div class="card">
+  <h1>🎨 AI 迷因生圖室</h1>
+  <p class="sub">輸入畫面描述 → 生成圖片 → 加上迷因文字 → 下載</p>
 
-<div class="header">🎨 圖片動畫生成器</div>
+  <div class="row">
+    <input type="text" id="prompt" placeholder="例如: 一隻橘貓坐在沙發上" style="flex:3;min-width:200px">
+    <select id="style" style="flex:1">
+      <option value="">預設</option>
+      <option value="anime">日系動漫</option>
+      <option value="meme">迷因風格</option>
+    </select>
+    <button id="genBtn" onclick="generate()">✨ 生成</button>
+  </div>
 
-<div class="tabs">
-  <button class="tab-btn active" data-tab="ai">AI 生成 ✨</button>
-  <button class="tab-btn" data-tab="meme">迷因</button>
-  <button class="tab-btn" data-tab="text">文字圖片</button>
-  <button class="tab-btn" data-tab="animation">動畫</button>
-</div>
+  <div id="loading" class="show">
+    <div style="margin-bottom:8px">⏳ AI 繪圖中，約 30-60 秒...</div>
+    <div style="font-size:12px;color:#666">（免費服務，模型載入較慢請耐心等待）</div>
+  </div>
 
-<!-- ═══ Tab 1: AI Generation ═══ -->
-<div class="tab-content active" id="tab-ai">
-  <div class="card">
-    <div class="card-title">AI 生成設定</div>
-    <label>輸入你想生成的內容</label>
-    <textarea id="ai-prompt" rows="3" placeholder="例如：一隻可愛的橘貓在草地上玩耍" style="margin-bottom:10px">一隻可愛的橘貓</textarea>
-    <div class="row">
-      <div>
-        <label>生成類型</label>
-        <select id="ai-type">
-          <option value="image">圖片</option>
-          <option value="video">動畫 / 影片</option>
-        </select>
-      </div>
-      <div>
-        <label>提供者</label>
-        <select id="ai-provider">
-          <option value="replicate">Replicate (推薦)</option>
-          <option value="huggingface">Hugging Face (免費)</option>
-          <option value="gemini">Gemini (免費)</option>
-          <option value="pollinations">Pollinations (免費)</option>
-          <option value="openai">OpenAI DALL-E 3 (需 API Key)</option>
-        </select>
-      </div>
+  <div id="result">
+    <div id="canvasWrap"><canvas id="mc"></canvas></div>
+    <div class="meme-inputs">
+      <input type="text" id="topText" placeholder="上層文字" oninput="draw()">
+      <input type="text" id="bottomText" placeholder="下層文字" oninput="draw()">
     </div>
-    <div class="row" style="margin-top:10px">
-      <div>
-        <label>寬度</label>
-        <input type="number" id="ai-w" value="1024" min="256" max="2048" step="64">
-      </div>
-      <div>
-        <label>高度</label>
-        <input type="number" id="ai-h" value="1024" min="256" max="2048" step="64">
-      </div>
-      <div>
-        <label>生成張數</label>
-        <input type="number" id="ai-count" value="1" min="1" max="4">
-      </div>
+    <div class="actions">
+      <button class="btn-dl" onclick="download()">💾 下載迷因圖</button>
+      <button class="btn-retry" onclick="regenerate()">🔄 重新生成</button>
     </div>
   </div>
-  <div class="card" id="ai-key-card">
-    <div class="card-title">API Key 設定</div>
-    <label>輸入你的 API Key</label>
-    <input type="password" id="ai-api-key" placeholder="貼上你的 API Key">
-    <div style="font-size:12px;color:var(--text2);margin-top:6px">
-      🔑 API Key 只存在瀏覽器中，不會被儲存到伺服器<br>
-      💡 Replicate: <a href="https://replicate.com" target="_blank" style="color:var(--accent)">replicate.com</a><br>
-      💡 Gemini: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a><br>
-      💡 Hugging Face: <a href="https://huggingface.co/settings/tokens" target="_blank" style="color:var(--accent)">huggingface.co/settings/tokens</a>
-    </div>
-  </div>
-  <button class="btn" onclick="generateAI()">🤖 AI 生成</button>
-</div>
 
-<!-- ═══ Tab 2: Meme ═══ -->
-<div class="tab-content" id="tab-meme">
-  <div class="card">
-    <div class="card-title">迷因設定</div>
-    <div class="row">
-      <div>
-        <label>上方文字</label>
-        <input type="text" id="meme-top" placeholder="輸入上方文字">
-      </div>
-      <div>
-        <label>下方文字</label>
-        <input type="text" id="meme-bottom" placeholder="輸入下方文字">
-      </div>
-    </div>
-    <div style="margin-top:12px">
-      <label>背景圖片</label>
-      <label class="file-btn" for="meme-file">📁 選擇圖片</label>
-      <input type="file" id="meme-file" accept="image/*">
-      <div class="file-name" id="meme-file-name">未選擇檔案</div>
-    </div>
-  </div>
-  <button class="btn" id="meme-generate" onclick="generateMeme()">🎭 生成迷因</button>
-</div>
-
-<!-- ═══ Tab 2: Text Image ═══ -->
-<div class="tab-content" id="tab-text">
-  <div class="card">
-    <div class="card-title">背景設定</div>
-    <div class="row">
-      <div>
-        <label>寬度</label>
-        <input type="number" id="text-w" value="800" min="100" max="2000">
-      </div>
-      <div>
-        <label>高度</label>
-        <input type="number" id="text-h" value="600" min="100" max="2000">
-      </div>
-    </div>
-    <div class="color-row" style="margin-top:12px">
-      <div><label>背景色</label><input type="color" id="text-bg" value="#1e1e1e"></div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title">文字設定</div>
-    <textarea id="text-content" rows="3" style="margin-bottom:10px">Hello World!</textarea>
-    <div class="row">
-      <div>
-        <label>字體大小</label>
-        <input type="number" id="text-fontsize" value="48" min="8" max="200">
-      </div>
-      <div>
-        <label>對齊</label>
-        <select id="text-align">
-          <option value="置中">置中</option>
-          <option value="靠左">靠左</option>
-          <option value="靠右">靠右</option>
-        </select>
-      </div>
-    </div>
-    <div class="color-row" style="margin-top:12px">
-      <div><label>文字色</label><input type="color" id="text-fg" value="#ffffff"></div>
-    </div>
-  </div>
-  <button class="btn" onclick="generateTextImage()">🖼 生成文字圖片</button>
-</div>
-
-<!-- ═══ Tab 3: Animation ═══ -->
-<div class="tab-content" id="tab-animation">
-  <div class="card">
-    <div class="card-title">動畫設定</div>
-    <div class="row">
-      <div>
-        <label>類型</label>
-        <select id="anim-type">
-          <option>文字跑馬燈</option>
-          <option>文字淡入淡出</option>
-          <option>文字彈跳</option>
-          <option>顏色漸變</option>
-          <option>旋轉文字</option>
-        </select>
-      </div>
-      <div>
-        <label>動畫文字</label>
-        <input type="text" id="anim-text" value="動畫!">
-      </div>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <div>
-        <label>幀數</label>
-        <input type="number" id="anim-frames" value="20" min="5" max="60">
-      </div>
-      <div>
-        <label>FPS</label>
-        <input type="number" id="anim-fps" value="10" min="1" max="30">
-      </div>
-      <div>
-        <label>寬度</label>
-        <input type="number" id="anim-w" value="400" min="100" max="1000">
-      </div>
-      <div>
-        <label>高度</label>
-        <input type="number" id="anim-h" value="200" min="100" max="1000">
-      </div>
-    </div>
-    <div class="color-row" style="margin-top:12px">
-      <div><label>前景色</label><input type="color" id="anim-fg" value="#ffffff"></div>
-      <div><label>背景色</label><input type="color" id="anim-bg" value="#000000"></div>
-    </div>
-  </div>
-  <button class="btn" onclick="generateAnimation()">🎬 生成動畫</button>
-</div>
-
-<!-- ═══ Preview ═══ -->
-<div class="preview-box">
-  <div class="card-title">預覽</div>
-  <div id="preview-area">
-    <div class="preview-placeholder">生成後的圖片會顯示在這裡 📱</div>
-  </div>
-  <div class="loading" id="loading">
-    <div class="spinner"></div>
-    <span>生成中...</span>
-  </div>
-  <a class="download-btn" id="download-link" download>⬇ 下載</a>
+  <div id="error" class="error" style="display:none"></div>
+  <footer>圖片由 Pollinations.ai 免費提供</footer>
 </div>
 
 <script>
-// ─── AI type / provider toggle ───
-document.getElementById('ai-type').addEventListener('change', function() {});
-document.getElementById('ai-provider').addEventListener('change', function() {
-  const needsKey = ['replicate', 'openai', 'gemini', 'huggingface'];
-  document.getElementById('ai-key-card').style.display =
-    needsKey.includes(this.value) ? '' : 'none';
-});
+let img = new Image();
+let currentPrompt = '';
 
-// ─── Tab switching ───
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-  });
-});
+async function generate() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) { showError('請輸入提示詞'); return; }
+  currentPrompt = prompt;
 
-// ─── File input display ───
-document.getElementById('meme-file').addEventListener('change', function() {
-  document.getElementById('meme-file-name').textContent = this.files[0]?.name || '未選擇檔案';
-});
+  document.getElementById('genBtn').disabled = true;
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('error').style.display = 'none';
 
-// ─── Helpers ───
-function showLoading(show) {
-  document.getElementById('loading').classList.toggle('show', show);
+  const style = document.getElementById('style').value;
+  const finalPrompt = style === 'anime' ? prompt + ', Japanese anime style, studio ghibli, high quality' :
+                      style === 'meme'  ? prompt + ', funny meme template, clean illustration' :
+                      prompt;
+
+  // Load Pollinations image directly in browser
+  const seed = Math.floor(Math.random() * 99999);
+  img.crossOrigin = 'anonymous';
+  img.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=1024&height=1024&seed=${seed}&nofeed=true`;
+
+  img.onload = () => {
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('result').classList.add('show');
+    document.getElementById('genBtn').disabled = false;
+    draw();
+  };
+  img.onerror = () => {
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('genBtn').disabled = false;
+    showError('Pollinations 免費服務目前無法使用，請稍後再試');
+  };
 }
-function showError(msg) {
-  const area = document.getElementById('preview-area');
-  const link = document.getElementById('download-link');
-  link.classList.remove('show');
-  area.innerHTML = `<div style="padding:40px 20px;color:var(--accent);font-size:14px;background:var(--surface);border-radius:8px;border:1px solid var(--accent);text-align:center"><strong>❌ 錯誤</strong><br><br>${msg}</div>`;
+
+function regenerate() {
+  if (currentPrompt) generate();
 }
-function showResult(url, filename) {
-  const area = document.getElementById('preview-area');
-  const link = document.getElementById('download-link');
-  if (filename.endsWith('.mp4') || filename.endsWith('.gif')) {
-    area.innerHTML = filename.endsWith('.mp4')
-      ? `<video src="${url}" autoplay loop controls style="max-width:100%;max-height:400px"></video>`
-      : `<img src="${url}" alt="動畫預覽">`;
-  } else {
-    area.innerHTML = `<img src="${url}" alt="圖片預覽">`;
+
+function draw() {
+  const canvas = document.getElementById('mc');
+  const ctx = canvas.getContext('2d');
+  canvas.width = img.naturalWidth || 1024;
+  canvas.height = img.naturalHeight || 1024;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const top = document.getElementById('topText').value.toUpperCase();
+  const bottom = document.getElementById('bottomText').value.toUpperCase();
+  const fs = Math.max(20, canvas.width * 0.07);
+  ctx.font = `bold ${fs}px Impact, Arial Black, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = fs * 0.1;
+  ctx.fillStyle = '#fff';
+
+  if (top) {
+    ctx.textBaseline = 'top';
+    const y = canvas.height * 0.05;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(top, canvas.width / 2, y);
+    ctx.fillText(top, canvas.width / 2, y);
   }
-  link.href = url;
-  link.download = filename;
-  link.classList.add('show');
+  if (bottom) {
+    ctx.textBaseline = 'bottom';
+    const y = canvas.height * 0.92;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(bottom, canvas.width / 2, y);
+    ctx.fillText(bottom, canvas.width / 2, y);
+  }
 }
 
-// ─── Meme ───
-async function generateMeme() {
-  const fileInput = document.getElementById('meme-file');
-  if (!fileInput.files[0]) { alert('請先選擇圖片'); return; }
-  showLoading(true);
-  const form = new FormData();
-  form.append('image', fileInput.files[0]);
-  form.append('top', document.getElementById('meme-top').value);
-  form.append('bottom', document.getElementById('meme-bottom').value);
-  try {
-    const res = await fetch('/api/meme', { method: 'POST', body: form });
-    if (!res.ok) { const e = await res.json(); alert(e.error); return; }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    showResult(url, 'meme.png');
-  } catch(e) { alert('生成失敗: ' + e.message); }
-  finally { showLoading(false); }
+function download() {
+  const canvas = document.getElementById('mc');
+  const link = document.createElement('a');
+  link.download = 'meme.jpg';
+  link.href = canvas.toDataURL('image/jpeg', 0.92);
+  link.click();
 }
 
-// ─── Text Image ───
-async function generateTextImage() {
-  showLoading(true);
-  try {
-    const res = await fetch('/api/text-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: document.getElementById('text-content').value,
-        width: parseInt(document.getElementById('text-w').value),
-        height: parseInt(document.getElementById('text-h').value),
-        fontSize: parseInt(document.getElementById('text-fontsize').value),
-        align: document.getElementById('text-align').value,
-        bgColor: document.getElementById('text-bg').value,
-        fgColor: document.getElementById('text-fg').value,
-      })
-    });
-    if (!res.ok) { const e = await res.json(); alert(e.error); return; }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    showResult(url, 'text-image.png');
-  } catch(e) { alert('生成失敗: ' + e.message); }
-  finally { showLoading(false); }
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = '❌ ' + msg;
+  el.style.display = 'block';
 }
 
-// ─── Animation ───
-async function generateAnimation() {
-  showLoading(true);
-  try {
-    const res = await fetch('/api/animation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: document.getElementById('anim-text').value,
-        type: document.getElementById('anim-type').value,
-        frames: parseInt(document.getElementById('anim-frames').value),
-        fps: parseInt(document.getElementById('anim-fps').value),
-        width: parseInt(document.getElementById('anim-w').value),
-        height: parseInt(document.getElementById('anim-h').value),
-        fgColor: document.getElementById('anim-fg').value,
-        bgColor: document.getElementById('anim-bg').value,
-      })
-    });
-    if (!res.ok) { const e = await res.json(); alert(e.error); return; }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    showResult(url, 'animation.gif');
-  } catch(e) { alert('生成失敗: ' + e.message); }
-  finally { showLoading(false); }
-}
-
-// ─── AI Generation ───
-async function generateAI() {
-  const prompt = document.getElementById('ai-prompt').value.trim();
-  if (!prompt) { alert('請輸入描述'); return; }
-  const type = document.getElementById('ai-type').value;
-  const provider = document.getElementById('ai-provider').value;
-  const apiKey = document.getElementById('ai-api-key').value;
-  const count = parseInt(document.getElementById('ai-count').value) || 1;
-  const w = parseInt(document.getElementById('ai-w').value);
-  const h = parseInt(document.getElementById('ai-h').value);
-  showLoading(true);
-  try {
-    const area = document.getElementById('preview-area');
-    const link = document.getElementById('download-link');
-    link.classList.remove('show');
-    area.innerHTML = '';
-
-    // Pollinations (free): call directly from browser to avoid server IP limits
-    if (provider === 'pollinations') {
-      const results = [];
-      for (let i = 0; i < count; i++) {
-        const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'text-align:center;width:100%';
-        const img = document.createElement('img');
-        img.style.cssText = 'max-width:100%;max-height:350px;border-radius:8px;margin:4px';
-        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${i}`;
-        img.onerror = function() {
-          wrapper.innerHTML = '<div style="padding:40px 20px;color:var(--text2);font-size:15px;background:var(--surface);border-radius:8px;border:1px solid #333">⚠️ Pollinations 免費版目前無法使用<br>請在上方切換到 <strong>Replicate</strong> 並貼上 API Key</div>';
-        };
-        img.src = url;
-        wrapper.appendChild(img);
-        area.appendChild(wrapper);
-        results.push(url);
-      }
-      link.href = results[0];
-      link.download = 'ai-image.png';
-      link.classList.add('show');
-      return;
-    }
-
-    const body = {
-      prompt: prompt, provider: provider, apiKey: apiKey,
-      width: w, height: h,
-    };
-    const endpoint = type === 'image' ? '/api/ai-image' : '/api/ai-video';
-
-    if (type === 'video') {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) {
-        let msg = `伺服器錯誤 (${res.status})`;
-        try { const e = await res.json(); if (e.error) msg = e.error; } catch(e2) {
-          try { msg = await res.text(); } catch(e3) {}
-        }
-        showError(msg);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      area.innerHTML = `<video src="${url}" autoplay loop controls style="max-width:100%;max-height:400px"></video>`;
-      link.href = url;
-      link.download = 'ai-video.mp4';
-      link.classList.add('show');
-    } else {
-      const results = [];
-      for (let i = 0; i < count; i++) {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...body, seed: i })
-        });
-        if (!res.ok) {
-          let msg = `伺服器錯誤 (${res.status})`;
-          try { const e = await res.json(); if (e.error) msg = e.error; } catch(e2) {
-            try { msg = await res.text(); } catch(e3) {}
-          }
-          showError(msg);
-          continue;
-        }
-        const blob = await res.blob();
-        results.push(URL.createObjectURL(blob));
-      }
-      if (results.length === 0) { area.innerHTML = '<div class="preview-placeholder">生成失敗</div>'; return; }
-      const container = document.createElement('div');
-      container.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;justify-content:center';
-      results.forEach((url) => {
-        const img = document.createElement('img');
-        img.src = url;
-        img.style.cssText = 'max-width:100%;max-height:350px;border-radius:8px;flex:1;min-width:200px';
-        container.appendChild(img);
-      });
-      area.appendChild(container);
-      link.href = results[0];
-      link.download = 'ai-image.png';
-      link.classList.add('show');
-    }
-  } catch(e) { showError('生成失敗: ' + e.message); }
-  finally { showLoading(false); }
-}
+// Start hidden
+document.getElementById('loading').classList.remove('show');
 </script>
 </body>
 </html>
