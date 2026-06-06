@@ -78,13 +78,24 @@ async function generate() {
 
     const img = document.getElementById('aiImage');
     const seed = Math.floor(Math.random() * 99999);
-    img.src = `/generate-image?prompt=${encodeURIComponent(engPrompt)}&seed=${seed}`;
 
-    img.onload = () => {
+    try {
+      const res = await fetch(`/generate-image?prompt=${encodeURIComponent(engPrompt)}&seed=${seed}`);
+      if (!res.ok) {
+        let msg = 'Pollinations 錯誤';
+        try { const e = await res.json(); msg = e.error; } catch(e2) { msg = await res.text(); }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      img.src = URL.createObjectURL(blob);
       document.getElementById('loading').classList.remove('show');
       document.getElementById('result').classList.add('show');
       document.getElementById('genBtn').disabled = false;
-    };
+    } catch (e) {
+      document.getElementById('loading').classList.remove('show');
+      document.getElementById('genBtn').disabled = false;
+      showError(e.message);
+    }
     img.onerror = () => {
       document.getElementById('loading').classList.remove('show');
       document.getElementById('result').classList.add('show');

@@ -67,19 +67,17 @@ def generate_image():
     if POLLINATIONS_KEY:
         poll_url += f"&key={POLLINATIONS_KEY}"
 
-    def proxy_stream():
-        try:
-            resp = requests.get(poll_url, stream=True, timeout=60)
-            if resp.status_code != 200:
-                yield f"Error {resp.status_code}".encode()
-                return
-            for chunk in resp.iter_content(chunk_size=8192):
-                if chunk:
-                    yield chunk
-        except Exception as e:
-            yield f"Proxy error: {str(e)[:100]}".encode()
+    url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}?width=1024&height=1024&seed={seed}&nofeed=true"
+    if POLLINATIONS_KEY:
+        url += f"&key={POLLINATIONS_KEY}"
 
-    return Response(stream_with_context(proxy_stream()), mimetype="image/jpeg")
+    try:
+        resp = requests.get(url, timeout=90)
+        if resp.status_code != 200:
+            return jsonify({"error": f"Pollinations {resp.status_code}: {resp.text[:200]}"}), 502
+        return Response(resp.content, mimetype="image/jpeg")
+    except Exception as e:
+        return jsonify({"error": f"Proxy: {str(e)[:200]}"}), 502
 
 
 if __name__ == "__main__":
