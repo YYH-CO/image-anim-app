@@ -416,6 +416,12 @@ document.getElementById('meme-file').addEventListener('change', function() {
 function showLoading(show) {
   document.getElementById('loading').classList.toggle('show', show);
 }
+function showError(msg) {
+  const area = document.getElementById('preview-area');
+  const link = document.getElementById('download-link');
+  link.classList.remove('show');
+  area.innerHTML = `<div style="padding:40px 20px;color:var(--accent);font-size:14px;background:var(--surface);border-radius:8px;border:1px solid var(--accent);text-align:center"><strong>❌ 錯誤</strong><br><br>${msg}</div>`;
+}
 function showResult(url, filename) {
   const area = document.getElementById('preview-area');
   const link = document.getElementById('download-link');
@@ -553,7 +559,7 @@ async function generateAI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch(e2) {} alert(msg || '生成失敗'); return; }
+      if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch(e2) {} showError(msg || '生成失敗'); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       area.innerHTML = `<video src="${url}" autoplay loop controls style="max-width:100%;max-height:400px"></video>`;
@@ -568,7 +574,7 @@ async function generateAI() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...body, seed: i })
         });
-        if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch(e2) {} alert(msg || `第 ${i+1} 張生成失敗`); continue; }
+        if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch(e2) {} showError(msg || `第 ${i+1} 張生成失敗`); continue; }
         const blob = await res.blob();
         results.push(URL.createObjectURL(blob));
       }
@@ -586,7 +592,7 @@ async function generateAI() {
       link.download = 'ai-image.png';
       link.classList.add('show');
     }
-  } catch(e) { alert('生成失敗: ' + e.message); }
+  } catch(e) { showError('生成失敗: ' + e.message); }
   finally { showLoading(false); }
 }
 </script>
