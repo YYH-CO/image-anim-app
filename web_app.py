@@ -296,6 +296,8 @@ def api_ai_image():
                 return _gen_openai_image(prompt, w, h, api_key)
             elif provider == "replicate":
                 return _gen_replicate_image(prompt, w, h, api_key)
+            elif provider == "gemini":
+                return _gen_gemini_image(prompt, api_key)
             else:
                 return _gen_pollinations_image(prompt, w, h, seed)
         except Exception as e:
@@ -384,6 +386,36 @@ def _gen_openai_image(prompt, w, h, api_key):
     img_url = resp.json()["data"][0]["url"]
     img_resp = http_requests.get(img_url, timeout=30)
     return send_file(io.BytesIO(img_resp.content), mimetype="image/png")
+
+
+def _gen_gemini_image(prompt, api_key):
+    if not api_key:
+        return jsonify({"error": "請輸入 Gemini API Key"}), 400
+    resp = http_requests.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={api_key}",
+        headers={"Content-Type": "application/json"},
+        json={
+            "contents": [{"parts": [{"text": f"Generate an image of: {prompt}. Return ONLY the image, no text."}]}],
+            "generationConfig": {"responseModalities": ["Image"]},
+        },
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        return jsonify({"error": f"Gemini 錯誤: {resp.text[:300]}"}), 502
+    data = resp.json()
+    candidates = data.get("candidates", [])
+    if not candidates:
+        return jsonify({"error": "Gemini 沒有回傳結果"}), 502
+    parts = candidates[0].get("content", {}).get("parts", [])
+    for part in parts:
+        if "inlineData" in part:
+            img_data = part["inlineData"]
+            mime = img_data.get("mimeType", "image/png")
+            b64 = img_data.get("data", "")
+            import base64
+            img_bytes = base64.b64decode(b64)
+            return send_file(io.BytesIO(img_bytes), mimetype=mime)
+    return jsonify({"error": "Gemini 回傳中沒有圖片資料"}), 502
 
 
 def _gen_replicate_image(prompt, w, h, api_key):
