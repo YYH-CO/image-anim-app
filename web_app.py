@@ -396,6 +396,7 @@ def _gen_gemini_image(prompt, api_key):
         "gemini-2.0-flash-exp",
         "gemini-2.0-flash-exp-image-generation",
     ]
+    last_detail = ""
     for model in models_to_try:
         try:
             resp = http_requests.post(
@@ -408,6 +409,7 @@ def _gen_gemini_image(prompt, api_key):
                 timeout=30,
             )
             if resp.status_code != 200:
+                last_detail = f"{model}: HTTP {resp.status_code} - {resp.text[:150]}"
                 continue
             data = resp.json()
             for candidate in data.get("candidates", []):
@@ -416,48 +418,71 @@ def _gen_gemini_image(prompt, api_key):
                         img_data = part["inlineData"]
                         img_bytes = base64.b64decode(img_data["data"])
                         return send_file(io.BytesIO(img_bytes), mimetype=img_data.get("mimeType", "image/png"))
-        except Exception:
+        except Exception as e:
+            last_detail = f"{model}: {str(e)[:100]}"
             continue
-    return jsonify({"error": "Gemini 生成失敗，請確認 API Key 有效且模型可用"}), 502
+    return jsonify({"error": f"Gemini 生成失敗: {last_detail}"}), 502
 
 
 def _gen_replicate_image(prompt, w, h, api_key):
     if not api_key:
         return jsonify({"error": "請輸入 Replicate API Key"}), 400
-    resp = http_requests.post(
-        "https://api.replicate.com/v1/models/black-forest-labs/flux-dev/predictions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={"input": {"prompt": prompt, "width": w, "height": h}},
-        timeout=15,
-    )
-    if resp.status_code != 201:
-        return jsonify({"error": f"Replicate 啟動失敗 ({resp.status_code}): {resp.text[:200]}"}), 502
 
-    prediction = resp.json()
-    get_url = prediction["urls"]["get"]
+    models_to_try = [
+        ("black-forest-labs/flux-dev", {"prompt": prompt, "width": w, "height": h}),
+        ("black-forest-labs/flux-schnell", {"prompt": prompt, "width": w, "height": h}),
+    ]
 
-    for _ in range(60):
-        time.sleep(1)
-        status_resp = http_requests.get(get_url, headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
-        if status_resp.status_code != 200:
+    for model_name, model_input in models_to_try:
+        try:
+            resp = http_requests.post(
+                f"https://api.replicate.com/v1/models/{model_name}/predictions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"input": model_input},
+                timeout=15,
+            )
+            if resp.status_code != 201:
+                continue
+
+            prediction = resp.json()
+            get_url = prediction["urls"]["get"]
+
+            for _ in range(60):
+                time.sleep(1)
+                status_resp = http_requests.get(get_url, headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
+                if status_resp.status_code != 200:
+                    continue
+                status = status_resp.json()
+                if status.get("status") == "succeeded":
+                    output = status.get("output", [])
+                    if not output:
+                        continue
+                    img_url = output[0] if isinstance(output, list) else output
+                    if isinstance(img_url, str):
+                        img_resp = http_requests.get(img_url, timeout=30)
+                        return send_file(io.BytesIO(img_resp.content), mimetype="image/png")
+                elif status.get("status") == "failed":
+                    break  # Try next model
+
+            # If we get here, the model failed - try next
             continue
-        status = status_resp.json()
-        if status.get("status") == "succeeded":
-            output = status.get("output", [])
-            if not output:
-                return jsonify({"error": "Replicate 輸出為空"}), 502
-            img_url = output[0] if isinstance(output, list) else output
-            if isinstance(img_url, str):
-                img_resp = http_requests.get(img_url, timeout=30)
-                return send_file(io.BytesIO(img_resp.content), mimetype="image/png")
-            return jsonify({"error": f"Replicate 輸出格式異常"}), 502
-        elif status.get("status") == "failed":
-            err = status.get("error", "未知錯誤")
-            return jsonify({"error": f"Replicate 生成失敗: {err}"}), 502
-    return jsonify({"error": "Replicate 生成超時"}), 504
+        except Exception:
+            continue
+
+    # If all models failed, try to give a more specific error
+    try:
+        # Check account status
+        check = http_requests.get("https://api.replicate.com/v1/account", headers={"Authorization": f"Bearer {api_key}"}, timeout=5)
+        if check.status_code == 401:
+            return jsonify({"error": "Replicate API Key 無效，請確認是否正確"}), 502
+        elif check.status_code == 200:
+            return jsonify({"error": "Replicate 帳戶餘額不足或模型無法使用，請到 replicate.com 充值"}), 502
+    except Exception:
+        pass
+    return jsonify({"error": "Replicate 生成失敗，請檢查 API Key 和帳戶狀態"}), 502
 
 
 # ─── AI Video / Animation ─────────────────────────────────
