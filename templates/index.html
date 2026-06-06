@@ -229,8 +229,8 @@
       <div>
         <label>提供者</label>
         <select id="ai-provider">
-          <option value="pollinations">Pollinations (免費)</option>
-          <option value="replicate">Replicate (需 API Key)</option>
+          <option value="replicate">Replicate (推薦)</option>
+          <option value="pollinations">Pollinations (免費，常無法使用)</option>
           <option value="openai">OpenAI DALL-E 3 (需 API Key)</option>
         </select>
       </div>
@@ -250,7 +250,7 @@
       </div>
     </div>
   </div>
-  <div class="card" id="ai-key-card" style="display:none">
+  <div class="card" id="ai-key-card">
     <div class="card-title">API Key 設定</div>
     <label>輸入你的 API Key</label>
     <input type="password" id="ai-api-key" placeholder="貼上你的 API Key">
@@ -526,7 +526,7 @@ async function generateAI() {
         img.style.cssText = 'max-width:100%;max-height:350px;border-radius:8px;margin:4px';
         const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${i}`;
         img.onerror = function() {
-          wrapper.innerHTML = '<div style="padding:20px;color:var(--text2);font-size:14px">⚠️ Pollinations 暫時無法使用<br>請改用 <strong>Replicate</strong> 並貼上 API Key</div>';
+          wrapper.innerHTML = '<div style="padding:40px 20px;color:var(--text2);font-size:15px;background:var(--surface);border-radius:8px;border:1px solid #333">⚠️ Pollinations 免費版目前無法使用<br>請在上方切換到 <strong>Replicate</strong> 並貼上 API Key</div>';
         };
         img.src = url;
         wrapper.appendChild(img);
