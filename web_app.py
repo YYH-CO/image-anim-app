@@ -457,38 +457,28 @@ def _gen_gemini_image(prompt, api_key):
 
 
 def _gen_huggingface_image(prompt, w, h, api_key=""):
-    models = [
-        "black-forest-labs/FLUX.1-dev",
-        "stabilityai/stable-diffusion-3.5-large",
-        "stabilityai/stable-diffusion-xl-base-1.0",
-    ]
+    model = "black-forest-labs/FLUX.1-dev"
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    last_detail = ""
-    for model in models:
-        try:
-            resp = http_requests.post(
-                f"https://api-inference.huggingface.co/models/{model}",
-                headers=headers,
-                json={"inputs": prompt},
-                timeout=120,
-            )
-            if resp.status_code == 200:
-                return send_file(io.BytesIO(resp.content), mimetype="image/png")
-            last_detail = f"{model}: HTTP {resp.status_code}"
-            if resp.status_code == 503:
-                data = resp.json()
-                last_detail += f" (排隊中: {data.get('estimated_time', '?')}s)"
-                time.sleep(2)
-                continue
-            elif resp.status_code == 401:
-                return jsonify({"error": "Hugging Face 需要 API Token（免費申請: huggingface.co/settings/tokens）"}), 502
-        except Exception as e:
-            last_detail = f"{model}: {str(e)[:80]}"
-            continue
-    return jsonify({"error": f"Hugging Face 無法使用: {last_detail}"}), 502
+    try:
+        resp = http_requests.post(
+            f"https://api-inference.huggingface.co/models/{model}",
+            headers=headers,
+            json={"inputs": prompt},
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            return send_file(io.BytesIO(resp.content), mimetype="image/png")
+        if resp.status_code == 401 or resp.status_code == 403:
+            return jsonify({
+                "error": "Hugging Face 需要 API Token（免費申請→ https://huggingface.co/settings/tokens）"
+            }), 502
+        body = resp.text[:200]
+        return jsonify({"error": f"Hugging Face {resp.status_code}: {body}"}), 502
+    except Exception as e:
+        return jsonify({"error": f"Hugging Face 連線失敗: {str(e)[:120]}"}), 502
 
 
 def _gen_replicate_image(prompt, w, h, api_key):
