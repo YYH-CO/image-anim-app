@@ -63,21 +63,60 @@ def generate_image():
     if not eng_prompt:
         return "Missing prompt", 400
 
-    poll_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}?width=1024&height=1024&seed={seed}&nofeed=true&model=flux"
-    if POLLINATIONS_KEY:
-        poll_url += f"&key={POLLINATIONS_KEY}"
+    # Try multiple URL patterns with retry
+    urls = []
+    base = f"https://image.pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}"
+    # Pattern 1: with nofeed + random seed
+    urls.append(f"{base}?width=1024&height=1024&seed={seed}&nofeed=true")
+    # Pattern 2: without nofeed
+    urls.append(f"{base}?width=1024&height=1024&seed={seed}")
+    # Pattern 3: without seed
+    urls.append(f"{base}?width=1024&height=1024&nofeed=true")
+    # Pattern 4: basic
+    urls.append(f"{base}?width=1024&height=1024")
 
-    url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}?width=1024&height=1024&seed={seed}&nofeed=true"
     if POLLINATIONS_KEY:
-        url += f"&key={POLLINATIONS_KEY}"
+        urls = [u + f"&key={POLLINATIONS_KEY}" for u in urls]
 
+    import time
+    import io
+    for url in urls:
+        try:
+            resp = requests.get(url, timeout=30)
+            if resp.status_code == 200:
+                return Response(resp.content, mimetype="image/jpeg")
+            if resp.status_code == 402:
+                time.sleep(1)
+                continue
+        except Exception:
+            continue
+
+    # Fallback: generate placeholder with prompt text
     try:
-        resp = requests.get(url, timeout=90)
-        if resp.status_code != 200:
-            return jsonify({"error": f"Pollinations {resp.status_code}: {resp.text[:200]}"}), 502
-        return Response(resp.content, mimetype="image/jpeg")
-    except Exception as e:
-        return jsonify({"error": f"Proxy: {str(e)[:200]}"}), 502
+        from PIL import Image, ImageDraw, ImageFont
+        img = Image.new("RGBA", (800, 600), (26, 26, 46, 255))
+        d = ImageDraw.Draw(img)
+        font = ImageFont.load_default()
+        lines = []
+        line = ""
+        for word in eng_prompt:
+            test = f"{line}{word}"
+            if d.textlength(test, font=font) > 700:
+                lines.append(line)
+                line = word
+            else:
+                line = test
+        lines.append(line)
+        y = (600 - len(lines) * 30) // 2
+        for line in lines:
+            tw = d.textlength(line, font=font)
+            d.text(((800 - tw) // 2, y), line, fill=(200, 200, 255, 255), font=font)
+            y += 30
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return Response(buf.getvalue(), mimetype="image/png")
+    except Exception:
+        return jsonify({"error": "Pollinations 忙碌，請稍後再試"}), 502
 
 
 if __name__ == "__main__":
