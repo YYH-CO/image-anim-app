@@ -29,7 +29,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 <body>
 <div class="card">
   <h1>🎨 AI 圖片生成器</h1>
-  <p class="sub">中文輸入 → AI 翻譯 → 自動繪圖（備用模式）</p>
+  <p class="sub">中文輸入 → AI 翻譯 → Hugging Face 繪圖</p>
 
   <input type="text" id="prompt" placeholder="輸入中文，例如：一隻穿著西裝的貓在開會">
   <button id="genBtn" onclick="generate()">✨ 生成圖片</button>
@@ -44,7 +44,7 @@ button:disabled { opacity: 0.5; cursor: default; }
   </div>
 
   <div id="error" class="error"></div>
-  <div class="hint">提示詞由 Groq AI 優化 | 圖片由 Pillow 產生</div>
+  <div class="hint">提示詞由 Groq AI 優化 | 圖片由 Hugging Face 生成</div>
 </div>
 
 <script>

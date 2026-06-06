@@ -5,7 +5,9 @@ app = Flask(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 SHARE_CODE = os.getenv("SHARE_CODE", "").strip()
-POLLINATIONS_KEY = os.getenv("POLLINATIONS_KEY", "").strip()
+HF_TOKEN = os.getenv("HF_TOKEN", "").strip()
+
+HF_MODEL = os.getenv("HF_MODEL", "stabilityai/stable-diffusion-xl-base-1.0").strip()
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -63,60 +65,72 @@ def generate_image():
     if not eng_prompt:
         return "Missing prompt", 400
 
-    # Try multiple URL patterns with retry
-    urls = []
-    base = f"https://image.pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}"
-    # Pattern 1: with nofeed + random seed
-    urls.append(f"{base}?width=1024&height=1024&seed={seed}&nofeed=true")
-    # Pattern 2: without nofeed
-    urls.append(f"{base}?width=1024&height=1024&seed={seed}")
-    # Pattern 3: without seed
-    urls.append(f"{base}?width=1024&height=1024&nofeed=true")
-    # Pattern 4: basic
-    urls.append(f"{base}?width=1024&height=1024")
-
-    if POLLINATIONS_KEY:
-        urls = [u + f"&key={POLLINATIONS_KEY}" for u in urls]
-
     import time
-    import io
-    for url in urls:
+
+    # Try Hugging Face Inference API
+    if HF_TOKEN:
+        headers = {
+            "Authorization": f"Bearer {HF_TOKEN}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "inputs": eng_prompt,
+            "parameters": {
+                "negative_prompt": "blurry, bad quality, distorted",
+                "width": 1024,
+                "height": 1024,
+                "seed": int(seed),
+            },
+        }
         try:
-            resp = requests.get(url, timeout=30)
+            print(f"HF request: {HF_MODEL}")
+            resp = requests.post(
+                f"https://api-inference.huggingface.co/models/{HF_MODEL}",
+                json=payload,
+                headers=headers,
+                timeout=60,
+            )
             if resp.status_code == 200:
+                print(f"HF success: {len(resp.content)} bytes")
                 return Response(resp.content, mimetype="image/jpeg")
-            if resp.status_code == 402:
-                time.sleep(1)
-                continue
-        except Exception:
-            continue
+            print(f"HF failed: HTTP {resp.status_code}, {resp.text[:200]}")
+        except Exception as e:
+            print(f"HF exception: {e}")
+    else:
+        print("No HF_TOKEN configured")
 
     # Fallback: generate placeholder with prompt text
     try:
         from PIL import Image, ImageDraw, ImageFont
-        img = Image.new("RGBA", (800, 600), (26, 26, 46, 255))
+        import io
+        W, H = 512, 512
+        img = Image.new("RGB", (W, H), (26, 26, 46))
         d = ImageDraw.Draw(img)
-        font = ImageFont.load_default()
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size=16)
+        except Exception:
+            font = ImageFont.load_default()
         lines = []
         line = ""
         for word in eng_prompt:
             test = f"{line}{word}"
-            if d.textlength(test, font=font) > 700:
+            if d.textlength(test, font=font) > W - 40:
                 lines.append(line)
                 line = word
             else:
                 line = test
         lines.append(line)
-        y = (600 - len(lines) * 30) // 2
+        y = (H - len(lines) * 24) // 2
         for line in lines:
             tw = d.textlength(line, font=font)
-            d.text(((800 - tw) // 2, y), line, fill=(200, 200, 255, 255), font=font)
-            y += 30
+            d.text(((W - tw) // 2, y), line, fill=(180, 220, 255), font=font)
+            y += 24
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         return Response(buf.getvalue(), mimetype="image/png")
-    except Exception:
-        return jsonify({"error": "Pollinations 忙碌，請稍後再試"}), 502
+    except Exception as e:
+        print(f"Pillow fallback failed: {e}")
+        return jsonify({"error": "圖片生成服務忙碌，請稍後再試"}), 502
 
 
 if __name__ == "__main__":
