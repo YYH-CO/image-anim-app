@@ -298,16 +298,24 @@ def api_ai_image():
 
 
 def _gen_pollinations_image(prompt, w, h):
-    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}"
-    resp = http_requests.get(url, timeout=60)
-    if resp.status_code != 200:
-        return jsonify({
-            "error": f"Pollinations 生成失敗 ({resp.status_code})，請稍後重試或更換其他提供者"
-        }), 502
-    return send_file(
-        io.BytesIO(resp.content),
-        mimetype=resp.headers.get("Content-Type", "image/png"),
-    )
+    # Try different URL formats for better reliability
+    urls = [
+        f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}",
+        f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?nofeed=true",
+    ]
+    for url in urls:
+        try:
+            resp = http_requests.get(url, timeout=60)
+            if resp.status_code == 200:
+                return send_file(
+                    io.BytesIO(resp.content),
+                    mimetype=resp.headers.get("Content-Type", "image/png"),
+                )
+        except Exception:
+            continue
+    return jsonify({
+        "error": "Pollinations 生成失敗（伺服器端限制），請更換提供者或使用 API Key"
+    }), 502
 
 
 def _gen_openai_image(prompt, w, h, api_key):
@@ -430,6 +438,11 @@ def _gen_replicate_video(prompt, api_key):
 
 
 # ─── Main Page ────────────────────────────────────────────────
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_file("static/favicon.png", mimetype="image/png")
+
 
 @app.route("/")
 def index():
