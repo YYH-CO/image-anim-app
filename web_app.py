@@ -392,36 +392,27 @@ def _gen_gemini_image(prompt, api_key):
     if not api_key:
         return jsonify({"error": "請輸入 Gemini API Key（免費申請: https://aistudio.google.com/apikey）"}), 400
     import base64
-    models_to_try = [
-        "gemini-2.0-flash-exp",
-        "gemini-2.0-flash-exp-image-generation",
-    ]
-    last_detail = ""
-    for model in models_to_try:
-        try:
-            resp = http_requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": f"Generate an image of: {prompt}"}]}],
-                    "generationConfig": {"responseModalities": ["Text", "Image"]},
-                },
-                timeout=30,
-            )
-            if resp.status_code != 200:
-                last_detail = f"{model}: HTTP {resp.status_code} - {resp.text[:150]}"
-                continue
-            data = resp.json()
-            for candidate in data.get("candidates", []):
-                for part in candidate.get("content", {}).get("parts", []):
-                    if "inlineData" in part:
-                        img_data = part["inlineData"]
-                        img_bytes = base64.b64decode(img_data["data"])
-                        return send_file(io.BytesIO(img_bytes), mimetype=img_data.get("mimeType", "image/png"))
-        except Exception as e:
-            last_detail = f"{model}: {str(e)[:100]}"
-            continue
-    return jsonify({"error": f"Gemini 生成失敗: {last_detail}"}), 502
+
+    resp = http_requests.post(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + api_key,
+        headers={"Content-Type": "application/json"},
+        json={
+            "contents": [{"parts": [{"text": f"Generate an image of: {prompt}"}]}],
+            "generationConfig": {"responseModalities": ["Text", "Image"]},
+        },
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        return jsonify({"error": f"Gemini 錯誤 ({resp.status_code}): {resp.text[:300]}"}), 502
+
+    data = resp.json()
+    for candidate in data.get("candidates", []):
+        for part in candidate.get("content", {}).get("parts", []):
+            if "inlineData" in part:
+                img_data = part["inlineData"]
+                img_bytes = base64.b64decode(img_data["data"])
+                return send_file(io.BytesIO(img_bytes), mimetype=img_data.get("mimeType", "image/png"))
+    return jsonify({"error": "Gemini 回傳中沒有圖片資料，請試試其他提供者"}), 502
 
 
 def _gen_replicate_image(prompt, w, h, api_key):
