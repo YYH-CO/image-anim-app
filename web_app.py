@@ -288,18 +288,27 @@ def tts():
     if not HF_TOKEN:
         return "No HF_TOKEN", 500
 
-    try:
-        resp = requests.post(
-            f"{HF_API_BASE}/models/espnet/kan-bayashi_ljspeech_vits",
-            json={"inputs": text},
-            headers={"Authorization": f"Bearer {HF_TOKEN}"},
-            timeout=30,
-        )
-        if resp.status_code == 200:
-            return Response(resp.content, mimetype="audio/wav")
-        return jsonify({"error": resp.text[:200]}), 502
-    except Exception as e:
-        return jsonify({"error": str(e)[:200]}), 502
+    errors = []
+    for model, payload in [
+        ("facebook/mms-tts", {"inputs": text, "parameters": {"language": "zho"}}),
+        ("facebook/mms-tts", {"inputs": text}),
+        ("espnet/kan-bayashi_ljspeech_vits", {"inputs": text}),
+    ]:
+        try:
+            resp = requests.post(
+                f"{HF_API_BASE}/models/{model}",
+                json=payload,
+                headers={"Authorization": f"Bearer {HF_TOKEN}"},
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                ct = resp.headers.get("Content-Type", "")
+                if "audio" in ct or len(resp.content) > 1000:
+                    return Response(resp.content, mimetype="audio/wav")
+            errors.append(f"{model}: HTTP {resp.status_code}")
+        except Exception as e:
+            errors.append(f"{model}: {str(e)[:60]}")
+    return jsonify({"error": "所有 TTS 模型皆失敗", "detail": "; ".join(errors)}), 502
 
 
 @app.route("/img2img", methods=["POST"])
