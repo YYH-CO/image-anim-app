@@ -196,11 +196,6 @@ def generate_image():
         print("No HF_TOKEN configured")
 
     # Fallback: generate placeholder with prompt text
-
-
-@app.route("/history")
-def history():
-    return jsonify(list(reversed(HISTORY)))
     try:
         from PIL import Image, ImageDraw, ImageFont
         import io
@@ -232,6 +227,146 @@ def history():
     except Exception as e:
         print(f"Pillow fallback failed: {e}")
         return jsonify({"error": "圖片生成服務忙碌，請稍後再試"}), 502
+
+
+@app.route("/history")
+def history():
+    return jsonify(list(reversed(HISTORY)))
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.get_json(force=True)
+    msg = data.get("message", "").strip()
+    history = data.get("history", [])
+    if not msg:
+        return jsonify({"error": "請輸入內容"}), 400
+    if not GROQ_API_KEY:
+        return jsonify({"error": "未設定 GROQ_API_KEY"}), 500
+
+    messages = [{"role": "system", "content": "你是一個有用的 AI 助手。用繁體中文回答。"}]
+    for h in history[-10:]:
+        messages.append(h)
+    messages.append({"role": "user", "content": msg})
+
+    try:
+        resp = requests.post(GROQ_URL, json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": messages,
+            "temperature": 0.7,
+            "stream": True,
+        }, headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        }, timeout=30, stream=True)
+
+        def generate():
+            for line in resp.iter_lines():
+                if line:
+                    try:
+                        d = line.decode().strip()
+                        if d.startswith("data: "):
+                            import json
+                            j = json.loads(d[6:])
+                            if "choices" in j and j["choices"]:
+                                delta = j["choices"][0].get("delta", {}).get("content", "")
+                                if delta:
+                                    yield delta
+                    except Exception:
+                        continue
+
+        return Response(stream_with_context(generate()), mimetype="text/plain")
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 502
+
+
+@app.route("/tts")
+def tts():
+    text = request.args.get("text", "").strip()
+    if not text:
+        return "Missing text", 400
+    if not HF_TOKEN:
+        return "No HF_TOKEN", 500
+
+    try:
+        resp = requests.post(
+            f"{HF_API_BASE}/models/espnet/kan-bayashi_ljspeech_vits",
+            json={"inputs": text},
+            headers={"Authorization": f"Bearer {HF_TOKEN}"},
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            return Response(resp.content, mimetype="audio/wav")
+        return jsonify({"error": resp.text[:200]}), 502
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 502
+
+
+@app.route("/img2img", methods=["POST"])
+def img2img():
+    data = request.get_json(force=True)
+    prompt = data.get("prompt", "").strip()
+    image_b64 = data.get("image", "")
+    if not prompt or not image_b64:
+        return jsonify({"error": "需要 prompt 和圖片"}), 400
+    if not HF_TOKEN:
+        return jsonify({"error": "未設定 HF_TOKEN"}), 500
+
+    import base64
+    try:
+        image_bytes = base64.b64decode(image_b64)
+    except Exception:
+        return jsonify({"error": "圖片格式錯誤"}), 400
+
+    try:
+        resp = requests.post(
+            f"{HF_API_BASE}/models/stabilityai/stable-diffusion-2-1",
+            json={"inputs": prompt, "image": image_b64},
+            headers={"Authorization": f"Bearer {HF_TOKEN}"},
+            timeout=60,
+        )
+        if resp.status_code == 200:
+            ct = resp.headers.get("Content-Type", "")
+            if "image" in ct or len(resp.content) > 1000:
+                return Response(resp.content, mimetype=ct if "image" in ct else "image/jpeg")
+        return jsonify({"error": resp.text[:200]}), 502
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 502
+
+
+@app.route("/batch-generate")
+def batch_generate():
+    eng_prompt = request.args.get("prompt", "")
+    count = int(request.args.get("count", "4"))
+    size_str = request.args.get("size", "512x512")
+    if not eng_prompt:
+        return "Missing prompt", 400
+    count = min(max(count, 1), 8)
+    import base64, concurrent.futures, requests as req
+
+    def fetch_one(seed):
+        try:
+            r = req.post(
+                f"{HF_API_BASE}/models/{HF_MODEL}",
+                json={"inputs": eng_prompt},
+                headers={"Authorization": f"Bearer {HF_TOKEN}"},
+                timeout=90,
+            )
+            if r.status_code == 200 and len(r.content) > 1000:
+                return {"seed": seed, "image": base64.b64encode(r.content).decode()}
+        except Exception:
+            pass
+        return None
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        futures = [ex.submit(fetch_one, i) for i in range(count)]
+        for f in concurrent.futures.as_completed(futures):
+            r = f.result()
+            if r:
+                results.append(r)
+
+    return jsonify({"images": results})
 
 
 if __name__ == "__main__":
