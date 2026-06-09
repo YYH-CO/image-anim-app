@@ -6,8 +6,8 @@
 <title>AI 圖片生成器</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, "Segoe UI", Helvetica, sans-serif; background: #121214; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.card { background: #1a1a2e; max-width: 600px; width: 100%; padding: 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+body { font-family: -apple-system, "Segoe UI", Helvetica, sans-serif; background: #121214; color: #e0e0e0; min-height: 100vh; padding: 16px; }
+.card { background: #1a1a2e; max-width: 600px; width: 100%; margin: 0 auto; padding: 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
 h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
 .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
 input, button { width: 100%; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #333; outline: none; }
@@ -16,18 +16,31 @@ input:focus { border-color: #00f5d4; }
 button { background: #00f5d4; color: #000; font-weight: 600; cursor: pointer; border: none; font-size: 16px; }
 button:hover { background: #00bbf9; color: #fff; }
 button:disabled { opacity: 0.5; cursor: default; }
-.row { display: flex; gap: 8px; margin-bottom: 12px; }
-.row select { flex: 1; padding: 10px; font-size: 14px; border-radius: 8px; border: 1px solid #333; background: #222; color: #eee; outline: none; }
+.btn-sm { background: #333; color: #eee; font-size: 13px; padding: 8px 14px; width: auto; border-radius: 6px; cursor: pointer; border: 1px solid #555; }
+.btn-sm:hover { background: #444; }
+.row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.row select, .row input:not([type=text]) { flex: 1; min-width: 0; padding: 10px; font-size: 14px; border-radius: 8px; border: 1px solid #333; background: #222; color: #eee; outline: none; }
 .row select:focus { border-color: #00f5d4; }
-.row label { flex: none; display: flex; align-items: center; color: #aaa; font-size: 13px; white-space: nowrap; }
+.row label { display: flex; align-items: center; color: #aaa; font-size: 13px; white-space: nowrap; }
+.advanced { margin-top: 8px; }
+.advanced-toggle { color: #666; font-size: 13px; cursor: pointer; user-select: none; padding: 4px 0; display: inline-block; }
+.advanced-toggle:hover { color: #00f5d4; }
+.advanced-body { display: none; margin-top: 8px; }
+.advanced-body.open { display: block; }
 #loading { display: none; text-align: center; padding: 30px; color: #888; font-size: 14px; }
 #loading.show { display: block; }
 #result { display: none; margin-top: 16px; }
 #result.show { display: block; }
 #result img { max-width: 100%; width: 100%; border-radius: 12px; box-shadow: 0 4px 25px rgba(0,245,212,0.15); display: block; background: #111; }
+.img-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
 .preview-box { background: #222; padding: 12px; border-radius: 8px; font-size: 13px; color: #00f5d4; word-break: break-all; margin-top: 10px; }
 .error { color: #ff6b6b; text-align: center; padding: 20px; font-size: 14px; display: none; }
 .hint { text-align: center; color: #555; font-size: 12px; margin-top: 12px; }
+.section-title { font-size: 18px; margin: 24px 0 12px; color: #ccc; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.gallery-item { background: #1a1a2e; border-radius: 10px; overflow: hidden; cursor: pointer; position: relative; }
+.gallery-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #111; }
+.gallery-item .gallery-label { padding: 6px 8px; font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #1a1a2e; }
 </style>
 </head>
 <body>
@@ -52,6 +65,19 @@ button:disabled { opacity: 0.5; cursor: default; }
       <option value="sketch">素描</option>
       <option value="pixel">像素風</option>
     </select>
+    <label>📏 尺寸</label>
+    <select id="size">
+      <option value="512x512">512×512</option>
+      <option value="1024x1024" selected>1024×1024</option>
+    </select>
+  </div>
+
+  <div class="advanced">
+    <span class="advanced-toggle" onclick="toggleAdvanced()">⚙️ 進階選項 ▸</span>
+    <div class="advanced-body" id="advancedBody">
+      <input type="text" id="negativePrompt" placeholder="不想出現的東西（選填，例如：模糊、變形）">
+      <input type="text" id="shareCode" placeholder="共享密碼（選填，若伺服器有設定）">
+    </div>
   </div>
 
   <button id="genBtn" onclick="generate()">✨ 生成圖片</button>
@@ -63,30 +89,54 @@ button:disabled { opacity: 0.5; cursor: default; }
   <div id="result">
     <div class="preview-box" id="promptDisplay"></div>
     <div style="margin-top:12px"><img id="aiImage" src="" alt=""></div>
+    <div class="img-actions">
+      <button class="btn-sm" id="downloadBtn" onclick="downloadImage()">⬇️ 下載</button>
+    </div>
   </div>
 
   <div id="error" class="error"></div>
   <div class="hint">提示詞由 Groq AI 優化 | 圖片由 Hugging Face 生成</div>
 </div>
 
+<div class="card" style="margin-top:20px">
+  <div class="section-title">🖼️ 歷史畫廊</div>
+  <div class="gallery" id="gallery"></div>
+  <p id="galleryEmpty" style="text-align:center;color:#555;font-size:13px;padding:20px">尚無圖片</p>
+</div>
+
 <script>
+let currentImageUrl = '';
+let currentZhPrompt = '';
+
+function toggleAdvanced() {
+  const body = document.getElementById('advancedBody');
+  const toggle = document.querySelector('.advanced-toggle');
+  body.classList.toggle('open');
+  toggle.textContent = body.classList.contains('open') ? '⚙️ 進階選項 ▾' : '⚙️ 進階選項 ▸';
+}
+
 async function generate() {
   const prompt = document.getElementById('prompt').value.trim();
   if (!prompt) { showError('請輸入內容'); return; }
 
   const mode = document.getElementById('mode').value;
   const style = document.getElementById('style').value;
+  const size = document.getElementById('size').value;
+  const negative = document.getElementById('negativePrompt').value.trim();
+  const code = document.getElementById('shareCode').value.trim();
 
   document.getElementById('genBtn').disabled = true;
   document.getElementById('loading').classList.add('show');
   document.getElementById('result').classList.remove('show');
   document.getElementById('error').style.display = 'none';
+  currentImageUrl = '';
+  currentZhPrompt = prompt;
 
   try {
     const res = await fetch('/optimize-prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, mode, style })
+      body: JSON.stringify({ prompt, mode, style, code })
     });
 
     if (!res.ok) {
@@ -118,7 +168,7 @@ async function generate() {
       document.getElementById('error').style.display = 'block';
     };
 
-    img.src = `/generate-image?prompt=${encodeURIComponent(engPrompt)}&seed=${seed}`;
+    img.src = `/generate-image?prompt=${encodeURIComponent(engPrompt)}&seed=${seed}&size=${size}&negative=${encodeURIComponent(negative)}&zh=${encodeURIComponent(prompt)}&mode=${mode}&style=${style}`;
   } catch (e) {
     document.getElementById('loading').classList.remove('show');
     document.getElementById('genBtn').disabled = false;
@@ -131,6 +181,43 @@ function showError(msg) {
   el.textContent = '❌ ' + msg;
   el.style.display = 'block';
 }
+
+function downloadImage() {
+  const img = document.getElementById('aiImage');
+  if (!img.src) return;
+  const link = document.createElement('a');
+  link.download = 'ai-image.png';
+  link.href = img.src;
+  link.click();
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch('/history');
+    if (!res.ok) return;
+    const items = await res.json();
+    const gallery = document.getElementById('gallery');
+    const empty = document.getElementById('galleryEmpty');
+    if (!items.length) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    gallery.innerHTML = items.map(item =>
+      `<div class="gallery-item" onclick="previewHistory('${item.image}')">
+        <img src="data:image/jpeg;base64,${item.image}" alt="${item.en}">
+        <div class="gallery-label">${item.mode === 'storyboard4' ? '📐分鏡' : '🖼單張'} ${item.style}</div>
+      </div>`
+    ).join('');
+  } catch (e) {}
+}
+
+function previewHistory(b64) {
+  const img = document.getElementById('aiImage');
+  img.src = 'data:image/jpeg;base64,' + b64;
+  document.getElementById('result').classList.add('show');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+loadHistory();
+setInterval(loadHistory, 5000);
 </script>
 </body>
 </html>

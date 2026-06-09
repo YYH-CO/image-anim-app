@@ -12,6 +12,24 @@ HF_API_BASE = os.getenv("HF_API_BASE", "https://router.huggingface.co/hf-inferen
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
+# In-memory history (max 20)
+HISTORY = []
+
+
+def add_history(zh_prompt, eng_prompt, mode, style, image_b64):
+    import time
+    entry = {
+        "zh": zh_prompt[:200],
+        "en": eng_prompt[:200],
+        "mode": mode,
+        "style": style,
+        "image": image_b64,
+        "time": int(time.time()),
+    }
+    HISTORY.append(entry)
+    if len(HISTORY) > 20:
+        HISTORY.pop(0)
+
 
 @app.route("/")
 def index():
@@ -23,14 +41,15 @@ def optimize_prompt():
     data = request.get_json(force=True)
     if not GROQ_API_KEY:
         return jsonify({"error": "伺服器未設定 GROQ_API_KEY"}), 500
-    if SHARE_CODE and data.get("code") != SHARE_CODE:
-        return jsonify({"error": "共享密碼錯誤"}), 403
 
     prompt = data.get("prompt", "").strip()
     mode = data.get("mode", "single").strip()
     style = data.get("style", "realistic").strip()
+    code = data.get("code", "").strip()
     if not prompt:
         return jsonify({"error": "請輸入內容"}), 400
+    if SHARE_CODE and code != SHARE_CODE:
+        return jsonify({"error": "共享密碼錯誤"}), 403
 
     style_map = {
         "realistic": "photorealistic, highly detailed, cinematic lighting",
@@ -128,10 +147,21 @@ def debug():
 def generate_image():
     eng_prompt = request.args.get("prompt", "")
     seed = request.args.get("seed", "42")
+    size_str = request.args.get("size", "1024x1024")
+    negative_prompt = request.args.get("negative", "")
+    zh_prompt = request.args.get("zh", "")  # original Chinese prompt
+    mode = request.args.get("mode", "single")
+    style_arg = request.args.get("style", "realistic")
     if not eng_prompt:
         return "Missing prompt", 400
 
-    import time
+    import time, base64
+
+    parts = size_str.split("x")
+    try:
+        W, H = int(parts[0]), int(parts[1])
+    except Exception:
+        W, H = 1024, 1024
 
     # Try Hugging Face Inference API
     if HF_TOKEN:
@@ -139,11 +169,10 @@ def generate_image():
             "Authorization": f"Bearer {HF_TOKEN}",
         }
         payload = {"inputs": eng_prompt}
-        models_to_try = [
-            HF_MODEL,
-            "runwayml/stable-diffusion-v1-5",
-            "stabilityai/stable-diffusion-2-1",
-        ]
+        # include negative prompt if provided
+        if negative_prompt:
+            payload["parameters"] = {"negative_prompt": negative_prompt}
+
         models_to_try = [HF_MODEL, "black-forest-labs/FLUX.1-schnell"]
         for model in models_to_try:
             try:
@@ -156,6 +185,8 @@ def generate_image():
                     ct = resp.headers.get("Content-Type", "")
                     if "image" in ct or len(resp.content) > 1000:
                         print(f"HF success: {model}, {len(resp.content)} bytes")
+                        b64 = base64.b64encode(resp.content).decode()
+                        add_history(zh_prompt, eng_prompt, mode, style_arg, b64)
                         return Response(resp.content, mimetype=ct if "image" in ct else "image/jpeg")
                 err = resp.text[:300] if resp.text else f"HTTP {resp.status_code}"
                 print(f"  -> Failed: {err}")
@@ -165,6 +196,11 @@ def generate_image():
         print("No HF_TOKEN configured")
 
     # Fallback: generate placeholder with prompt text
+
+
+@app.route("/history")
+def history():
+    return jsonify(list(reversed(HISTORY)))
     try:
         from PIL import Image, ImageDraw, ImageFont
         import io
