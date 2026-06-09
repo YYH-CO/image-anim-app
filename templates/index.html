@@ -3,20 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>AI 圖片生成器</title>
+<title>AI 多媒體工具</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, "Segoe UI", Helvetica, sans-serif; background: #121214; color: #e0e0e0; min-height: 100vh; padding: 12px; }
 .card { background: #1a1a2e; max-width: 620px; width: 100%; margin: 0 auto 16px; padding: 20px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
 h1 { font-size: 20px; text-align: center; }
 .sub { text-align: center; color: #888; font-size: 12px; margin-bottom: 16px; }
-
-.tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
-.tab { flex: 1; text-align: center; padding: 8px 4px; font-size: 12px; background: #222; color: #888; border-radius: 8px; cursor: pointer; min-width: 0; white-space: nowrap; }
+.tabs { display: flex; gap: 3px; margin-bottom: 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+.tab { flex-shrink: 0; padding: 7px 10px; font-size: 12px; background: #222; color: #888; border-radius: 8px; cursor: pointer; white-space: nowrap; }
 .tab.active { background: #00f5d4; color: #000; font-weight: 600; }
 .tab-body { display: none; }
 .tab-body.active { display: block; }
-
 input, textarea, button { width: 100%; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #333; outline: none; }
 input, textarea { background: #222; color: #eee; margin-bottom: 10px; }
 textarea { resize: vertical; min-height: 60px; font-family: inherit; }
@@ -26,17 +24,14 @@ button:hover { background: #00bbf9; color: #fff; }
 button:disabled { opacity: 0.5; cursor: default; }
 .btn-sm { background: #333; color: #eee; font-size: 13px; padding: 8px 14px; width: auto; border-radius: 6px; cursor: pointer; border: 1px solid #555; }
 .btn-sm:hover { background: #444; }
-
 .row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .row select, .row input:not([type=text]) { flex: 1; min-width: 0; padding: 10px; font-size: 14px; border-radius: 8px; border: 1px solid #333; background: #222; color: #eee; outline: none; }
 .row label { display: flex; align-items: center; color: #aaa; font-size: 13px; white-space: nowrap; }
-
 .advanced { margin-top: 6px; }
 .advanced-toggle { color: #666; font-size: 13px; cursor: pointer; user-select: none; padding: 4px 0; display: inline-block; }
 .advanced-toggle:hover { color: #00f5d4; }
 .advanced-body { display: none; margin-top: 6px; }
 .advanced-body.open { display: block; }
-
 #loading { display: none; text-align: center; padding: 20px; color: #888; font-size: 14px; }
 #loading.show { display: block; }
 #result { display: none; margin-top: 12px; }
@@ -45,20 +40,33 @@ button:disabled { opacity: 0.5; cursor: default; }
 .img-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
 .preview-box { background: #222; padding: 10px; border-radius: 8px; font-size: 13px; color: #00f5d4; word-break: break-all; margin-top: 8px; }
 .error { color: #ff6b6b; text-align: center; padding: 12px; font-size: 14px; display: none; }
-.hint { text-align: center; color: #555; font-size: 12px; margin-top: 10px; }
-
 .section-title { font-size: 16px; margin: 16px 0 10px; color: #ccc; }
-.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-.gallery-item { background: #1a1a2e; border-radius: 10px; overflow: hidden; cursor: pointer; position: relative; }
-.gallery-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #111; }
-.gallery-item .gallery-label { padding: 4px 6px; font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #1a1a2e; }
+
+/* Tabs scrollbar */
+.tabs::-webkit-scrollbar { height: 2px; }
+.tabs::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+/* Saved prompts */
+.saved-list { display: none; margin-bottom: 10px; }
+.saved-list.open { display: block; }
+.saved-item { display: flex; gap: 6px; align-items: center; padding: 6px 8px; background: #222; border-radius: 6px; margin-bottom: 4px; font-size: 13px; cursor: pointer; }
+.saved-item:hover { background: #2a2a3e; }
+.saved-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-item .del { color: #ff6b6b; cursor: pointer; font-size: 15px; padding: 0 4px; }
+
+/* Palette */
+.palette { display: none; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.palette.show { display: flex; }
+.swatch { width: 40px; height: 40px; border-radius: 8px; cursor: pointer; border: 2px solid #333; position: relative; }
+.swatch:hover { border-color: #00f5d4; }
+.swatch .hex { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #888; white-space: nowrap; }
 
 /* Chat */
 .chat-box { background: #111; border-radius: 10px; padding: 12px; height: 300px; overflow-y: auto; margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; }
 .chat-msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 14px; line-height: 1.5; }
 .chat-msg.user { background: #00f5d4; color: #000; align-self: flex-end; }
 .chat-msg.bot { background: #2a2a4a; color: #e0e0e0; align-self: flex-start; }
-.chat-msg.error { background: #3a1a1a; color: #ff6b6b; align-self: flex-start; text-align: left; }
+.chat-msg.error { background: #3a1a1a; color: #ff6b6b; align-self: flex-start; }
 .chat-msg.loading { background: transparent; color: #888; align-self: flex-start; font-style: italic; }
 .chat-row { display: flex; gap: 8px; }
 .chat-row input { flex: 1; margin-bottom: 0; }
@@ -66,7 +74,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 /* TTS */
 .tts-row { display: flex; gap: 8px; align-items: flex-end; }
-.tts-row textarea { flex: 1; margin-bottom: 0; }
 .tts-row button { width: auto; padding: 12px 20px; white-space: nowrap; }
 
 /* Image upload */
@@ -78,21 +85,27 @@ button:disabled { opacity: 0.5; cursor: default; }
 .batch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 10px; }
 .batch-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: #111; }
 
-/* Saved prompts */
-.saved-list { display: none; margin-bottom: 10px; }
-.saved-list.open { display: block; }
-.saved-item { display: flex; gap: 6px; align-items: center; padding: 6px 8px; background: #222; border-radius: 6px; margin-bottom: 4px; font-size: 13px; cursor: pointer; }
-.saved-item:hover { background: #2a2a3e; }
-.saved-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.saved-item .del { color: #ff6b6b; cursor: pointer; font-size: 15px; padding: 0 4px; }
-.saved-item .del:hover { color: #ff4444; }
+/* Story */
+.scene { background: #222; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+.scene .num { color: #00f5d4; font-size: 12px; font-weight: 600; }
+.scene .para { margin: 8px 0; line-height: 1.7; font-size: 14px; }
+.scene img { width: 100%; border-radius: 8px; margin-top: 8px; background: #111; }
+.scene .gen-pending { text-align: center; padding: 20px; color: #888; font-size: 13px; }
 
-/* Palette */
-.palette { display: none; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-.palette.show { display: flex; }
-.swatch { width: 40px; height: 40px; border-radius: 8px; cursor: pointer; border: 2px solid #333; position: relative; }
-.swatch:hover { border-color: #00f5d4; }
-.swatch .hex { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #888; white-space: nowrap; }
+/* Meme */
+.meme-canvas-wrap { background: #111; border-radius: 12px; overflow: hidden; margin-top: 10px; }
+.meme-canvas-wrap canvas { width: 100%; display: block; }
+.meme-upload { border: 2px dashed #444; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; color: #888; font-size: 14px; background: #1e1e30; margin-bottom: 10px; }
+.meme-upload.dragover { border-color: #00f5d4; background: #1a2a3e; }
+
+/* Collage */
+.collage-grid { display: grid; gap: 4px; background: #111; border-radius: 12px; overflow: hidden; margin-top: 10px; }
+.collage-grid img { width: 100%; display: block; }
+.collage-upload-area { border: 2px dashed #444; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; color: #888; font-size: 14px; background: #1e1e30; margin-bottom: 10px; }
+.collage-upload-area.dragover { border-color: #00f5d4; background: #1a2a3e; }
+.collage-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.collage-thumbs img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 2px solid #333; cursor: pointer; }
+.collage-thumbs img.selected { border-color: #00f5d4; }
 </style>
 </head>
 <body>
@@ -100,16 +113,18 @@ button:disabled { opacity: 0.5; cursor: default; }
 <div class="card">
   <h1>🎨 AI 多媒體工具</h1>
   <p class="sub">中文輸入 → AI 翻譯 → Hugging Face / Groq</p>
-
   <div class="tabs" id="tabs">
     <div class="tab active" data-tab="gen">🖼️ 生圖</div>
+    <div class="tab" data-tab="story">📖 故事</div>
     <div class="tab" data-tab="chat">💬 聊天</div>
     <div class="tab" data-tab="img2img">🖼️→🖼️ 改圖</div>
     <div class="tab" data-tab="batch">🔄 批次</div>
+    <div class="tab" data-tab="meme">🎭 迷因</div>
+    <div class="tab" data-tab="collage">🖼️ 拼貼</div>
     <div class="tab" data-tab="tts">🔊 語音</div>
   </div>
 
-  <!-- ===== Tab 1: Generate Image ===== -->
+  <!-- ===== Tab 1: Generate ===== -->
   <div class="tab-body active" id="tab-gen">
     <div class="row" style="margin-bottom:0">
       <input type="text" id="prompt" placeholder="輸入中文，例如：一隻穿著西裝的貓在開會" style="flex:1;margin-bottom:0">
@@ -118,25 +133,9 @@ button:disabled { opacity: 0.5; cursor: default; }
     </div>
     <div class="saved-list" id="savedList"></div>
     <div class="row">
-      <label>📐</label>
-      <select id="mode">
-        <option value="single">單張圖片</option>
-        <option value="storyboard4">四格分鏡</option>
-      </select>
-      <label>🎨</label>
-      <select id="style">
-        <option value="realistic">寫實</option>
-        <option value="anime">動漫</option>
-        <option value="watercolor">水彩</option>
-        <option value="oilpainting">油畫</option>
-        <option value="sketch">素描</option>
-        <option value="pixel">像素風</option>
-      </select>
-      <label>📏</label>
-      <select id="size">
-        <option value="512x512">512×512</option>
-        <option value="1024x1024" selected>1024×1024</option>
-      </select>
+      <label>📐</label><select id="mode"><option value="single">單張</option><option value="storyboard4">四格</option></select>
+      <label>🎨</label><select id="style"><option value="realistic">寫實</option><option value="anime">動漫</option><option value="watercolor">水彩</option><option value="oilpainting">油畫</option><option value="sketch">素描</option><option value="pixel">像素風</option></select>
+      <label>📏</label><select id="size"><option value="512x512">512×512</option><option value="1024x1024" selected>1024×1024</option></select>
     </div>
     <div class="advanced">
       <span class="advanced-toggle" onclick="toggleAdvanced()">⚙️ 進階選項 ▸</span>
@@ -152,14 +151,24 @@ button:disabled { opacity: 0.5; cursor: default; }
       <div class="preview-box" id="promptDisplay"></div>
       <div style="margin-top:10px"><img id="aiImage" src="" alt=""></div>
       <div class="palette" id="palette"></div>
-      <div class="img-actions">
-        <button class="btn-sm" id="downloadBtn" onclick="downloadImage()">⬇️ 下載</button>
-      </div>
+      <div class="img-actions"><button class="btn-sm" onclick="downloadImage()">⬇️ 下載</button></div>
     </div>
     <div id="error" class="error"></div>
   </div>
 
-  <!-- ===== Tab 2: Chat ===== -->
+  <!-- ===== Tab 2: Story ===== -->
+  <div class="tab-body" id="tab-story">
+    <input type="text" id="storyTheme" placeholder="輸入故事主題，例如：一隻勇敢的小貓">
+    <div class="row">
+      <label>🎨 風格</label>
+      <select id="storyStyle"><option value="realistic">寫實</option><option value="anime" selected>動漫</option><option value="watercolor">水彩</option><option value="oilpainting">油畫</option><option value="sketch">素描</option><option value="pixel">像素風</option></select>
+    </div>
+    <button onclick="generateStory()">📖 生成故事</button>
+    <div id="storyLoading" style="display:none;text-align:center;padding:20px;color:#888">⏳ 生成故事中...</div>
+    <div id="storyResult" style="margin-top:12px"></div>
+  </div>
+
+  <!-- ===== Tab 3: Chat ===== -->
   <div class="tab-body" id="tab-chat">
     <div class="chat-box" id="chatBox"></div>
     <div class="chat-row">
@@ -168,7 +177,7 @@ button:disabled { opacity: 0.5; cursor: default; }
     </div>
   </div>
 
-  <!-- ===== Tab 3: Image-to-Image ===== -->
+  <!-- ===== Tab 4: img2img ===== -->
   <div class="tab-body" id="tab-img2img">
     <div class="upload-area" id="uploadArea" onclick="document.getElementById('imgInput').click()">
       <div id="uploadText">點擊或拖曳圖片到此處</div>
@@ -179,48 +188,62 @@ button:disabled { opacity: 0.5; cursor: default; }
     <button onclick="sendImg2Img()">🎨 生成</button>
     <div id="img2imgResult" style="display:none;margin-top:10px">
       <img id="img2imgImage" src="" style="width:100%;border-radius:12px">
-      <div class="img-actions">
-        <button class="btn-sm" onclick="downloadImg2Img()">⬇️ 下載</button>
-      </div>
+      <div class="img-actions"><button class="btn-sm" onclick="downloadImg2Img()">⬇️ 下載</button></div>
     </div>
   </div>
 
-  <!-- ===== Tab 4: Batch ===== -->
+  <!-- ===== Tab 5: Batch ===== -->
   <div class="tab-body" id="tab-batch">
     <input type="text" id="batchPrompt" placeholder="輸入中文提示詞...">
     <div class="row">
-      <label>數量</label>
-      <select id="batchCount">
-        <option value="2">2 張</option>
-        <option value="4" selected>4 張</option>
-        <option value="6">6 張</option>
-        <option value="8">8 張</option>
-      </select>
-      <label>尺寸</label>
-      <select id="batchSize">
-        <option value="512x512" selected>512×512</option>
-        <option value="1024x1024">1024×1024</option>
-      </select>
+      <label>數量</label><select id="batchCount"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option><option value="8">8</option></select>
+      <label>尺寸</label><select id="batchSize"><option value="512x512" selected>512×512</option><option value="1024x1024">1024×1024</option></select>
     </div>
     <button onclick="batchGenerate()">🔄 批次生成</button>
     <div id="batchLoading" style="display:none;text-align:center;padding:16px;color:#888">⏳ 生成中...</div>
     <div class="batch-grid" id="batchGrid"></div>
   </div>
 
-  <!-- ===== Tab 5: TTS ===== -->
-  <div class="tab-body" id="tab-tts">
-    <textarea id="ttsText" placeholder="輸入要轉成語音的文字...">你好，歡迎使用 AI 多媒體工具。這是一個測試語音。</textarea>
+  <!-- ===== Tab 6: Meme ===== -->
+  <div class="tab-body" id="tab-meme">
+    <div class="meme-upload" id="memeUpload" onclick="document.getElementById('memeFile').click()">
+      <div id="memeUploadText">點擊或拖曳圖片（或用最近生成的圖片）</div>
+      <img id="memePreview" style="display:none;max-width:100%;max-height:180px;border-radius:8px;margin-top:8px">
+    </div>
+    <input type="file" id="memeFile" accept="image/*" style="display:none" onchange="loadMemeImage(event)">
+    <input type="text" id="memeTop" placeholder="上方文字（選填）">
+    <input type="text" id="memeBottom" placeholder="下方文字（選填）">
     <div class="row">
-      <label>🎤 語音</label>
-      <select id="ttsVoice"><option value="">系統預設</option></select>
-      <label>⚡ 速度</label>
-      <select id="ttsRate">
-        <option value="0.5">0.5x</option>
-        <option value="0.75">0.75x</option>
-        <option value="1" selected>1x</option>
-        <option value="1.25">1.25x</option>
-        <option value="1.5">1.5x</option>
-      </select>
+      <button onclick="renderMeme()" style="flex:1">🎭 生成迷因</button>
+      <button class="btn-sm" id="memeDlBtn" style="display:none" onclick="downloadMeme()">⬇️ 下載</button>
+    </div>
+    <div class="meme-canvas-wrap" id="memeCanvasWrap" style="display:none">
+      <canvas id="memeCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- ===== Tab 7: Collage ===== -->
+  <div class="tab-body" id="tab-collage">
+    <div class="collage-upload-area" id="collageUpload" onclick="document.getElementById('collageFiles').click()">
+      <div id="collageUploadText">點擊選擇多張圖片（或拖曳）</div>
+    </div>
+    <input type="file" id="collageFiles" accept="image/*" multiple style="display:none" onchange="loadCollageImages(event)">
+    <div class="collage-thumbs" id="collageThumbs"></div>
+    <div class="row">
+      <label>佈局</label>
+      <select id="collageLayout"><option value="2x2">2×2</option><option value="3x3">3×3</option><option value="4x4">4×4</option></select>
+      <button onclick="renderCollage()" style="flex:1">🖼️ 生成拼貼</button>
+      <button class="btn-sm" id="collageDlBtn" style="display:none" onclick="downloadCollage()">⬇️ 下載</button>
+    </div>
+    <div id="collageResult" style="display:none;margin-top:8px"></div>
+  </div>
+
+  <!-- ===== Tab 8: TTS ===== -->
+  <div class="tab-body" id="tab-tts">
+    <textarea id="ttsText" placeholder="輸入要轉成語音的文字...">你好，歡迎使用 AI 多媒體工具。</textarea>
+    <div class="row">
+      <label>🎤</label><select id="ttsVoice"><option value="">系統預設</option></select>
+      <label>⚡</label><select id="ttsRate"><option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option></select>
     </div>
     <div class="tts-row">
       <button onclick="speakTTS()">🔊 朗讀</button>
@@ -244,36 +267,27 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab-body').forEach(b => b.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   });
 });
 
-// === Saved Prompts (localStorage) ===
-function getSavedPrompts() {
-  try { return JSON.parse(localStorage.getItem('savedPrompts') || '[]'); } catch { return []; }
+// ===== 1. Generate Image =====
+function toggleAdvanced() {
+  const body = document.getElementById('advancedBody');
+  const toggle = document.querySelector('.advanced-toggle');
+  body.classList.toggle('open');
+  toggle.textContent = body.classList.contains('open') ? '⚙️ 進階選項 ▾' : '⚙️ 進階選項 ▸';
 }
 
-function setSavedPrompts(list) {
-  localStorage.setItem('savedPrompts', JSON.stringify(list));
-  renderSaved();
-}
-
+function getSavedPrompts() { try { return JSON.parse(localStorage.getItem('savedPrompts') || '[]'); } catch { return []; } }
+function setSavedPrompts(list) { localStorage.setItem('savedPrompts', JSON.stringify(list)); renderSaved(); }
 function savePrompt() {
   const name = prompt('為這個設定取個名稱：');
   if (!name) return;
-  const item = {
-    name,
-    prompt: document.getElementById('prompt').value,
-    mode: document.getElementById('mode').value,
-    style: document.getElementById('style').value,
-    size: document.getElementById('size').value,
-    negative: document.getElementById('negativePrompt').value,
-    seed: document.getElementById('seedInput').value,
-  };
   const list = getSavedPrompts();
-  list.push(item);
+  list.push({ name, prompt: document.getElementById('prompt').value, mode: document.getElementById('mode').value, style: document.getElementById('style').value, size: document.getElementById('size').value, negative: document.getElementById('negativePrompt').value, seed: document.getElementById('seedInput').value });
   setSavedPrompts(list);
 }
-
 function loadPrompt(item) {
   document.getElementById('prompt').value = item.prompt || '';
   document.getElementById('mode').value = item.mode || 'single';
@@ -283,37 +297,13 @@ function loadPrompt(item) {
   document.getElementById('seedInput').value = item.seed || '';
   document.getElementById('savedList').classList.remove('open');
 }
-
-function deletePrompt(i) {
-  const list = getSavedPrompts();
-  list.splice(i, 1);
-  setSavedPrompts(list);
-}
-
-function toggleSaved() {
-  const el = document.getElementById('savedList');
-  el.classList.toggle('open');
-  if (el.classList.contains('open')) renderSaved();
-}
-
+function deletePrompt(i) { const list = getSavedPrompts(); list.splice(i, 1); setSavedPrompts(list); }
+function toggleSaved() { const el = document.getElementById('savedList'); el.classList.toggle('open'); if (el.classList.contains('open')) renderSaved(); }
 function renderSaved() {
   const list = getSavedPrompts();
-  const el = document.getElementById('savedList');
-  if (!list.length) { el.innerHTML = '<div style="color:#555;font-size:13px;padding:8px">尚無收藏</div>'; return; }
-  el.innerHTML = list.map((item, i) =>
-    `<div class="saved-item" onclick="loadPrompt(getSavedPrompts()[${i}])">
-      <span class="name">${item.name}</span>
-      <span class="del" onclick="event.stopPropagation();deletePrompt(${i})">✕</span>
-    </div>`
-  ).join('');
-}
-
-// === Generate Image ===
-function toggleAdvanced() {
-  const body = document.getElementById('advancedBody');
-  const toggle = document.querySelector('.advanced-toggle');
-  body.classList.toggle('open');
-  toggle.textContent = body.classList.contains('open') ? '⚙️ 進階選項 ▾' : '⚙️ 進階選項 ▸';
+  document.getElementById('savedList').innerHTML = list.length ? list.map((item, i) =>
+    `<div class="saved-item" onclick="loadPrompt(getSavedPrompts()[${i}])"><span class="name">${item.name}</span><span class="del" onclick="event.stopPropagation();deletePrompt(${i})">✕</span></div>`
+  ).join('') : '<div style="color:#555;font-size:13px;padding:8px">尚無收藏</div>';
 }
 
 async function generate() {
@@ -324,334 +314,298 @@ async function generate() {
   const size = document.getElementById('size').value;
   const negative = document.getElementById('negativePrompt').value.trim();
   const code = document.getElementById('shareCode').value.trim();
-  const seedInput = document.getElementById('seedInput').value.trim();
-  const seed = seedInput ? parseInt(seedInput) : Math.floor(Math.random() * 99999);
-  document.getElementById('genBtn').disabled = true;
+  const seed = parseInt(document.getElementById('seedInput').value) || Math.floor(Math.random() * 99999);
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true;
   document.getElementById('loading').classList.add('show');
   document.getElementById('result').classList.remove('show');
   document.getElementById('error').style.display = 'none';
   document.getElementById('palette').classList.remove('show');
   try {
-    const res = await fetch('/optimize-prompt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, mode, style, code })
-    });
-    if (!res.ok) {
-      let msg = '伺服器錯誤';
-      try { const e = await res.json(); msg = e.error || e.detail; } catch(e2) { msg = await res.text(); }
-      throw new Error(msg);
-    }
+    const res = await fetch('/optimize-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode, style, code }) });
+    if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch { msg = await res.text(); } throw new Error(msg); }
     const data = await res.json();
-    const engPrompt = data.optimized_prompt;
-    document.getElementById('promptDisplay').textContent = `✨ Seed: ${seed} | ${engPrompt}`;
+    document.getElementById('promptDisplay').textContent = `✨ Seed: ${seed} | ${data.optimized_prompt}`;
     document.getElementById('loading').innerHTML = '<div>🚀 產生圖片中...</div>';
     const img = document.getElementById('aiImage');
-    img.onload = () => {
-      document.getElementById('loading').classList.remove('show');
-      document.getElementById('result').classList.add('show');
-      document.getElementById('genBtn').disabled = false;
-      extractPalette(img);
-    };
-    img.onerror = () => {
-      document.getElementById('loading').classList.remove('show');
-      document.getElementById('result').classList.add('show');
-      document.getElementById('genBtn').disabled = false;
-      document.getElementById('error').textContent = '⚠️ 圖片產生失敗';
-      document.getElementById('error').style.display = 'block';
-    };
-    img.src = `/generate-image?prompt=${encodeURIComponent(engPrompt)}&seed=${seed}&size=${size}&negative=${encodeURIComponent(negative)}&zh=${encodeURIComponent(prompt)}&mode=${mode}&style=${style}`;
+    img.onload = () => { document.getElementById('loading').classList.remove('show'); document.getElementById('result').classList.add('show'); btn.disabled = false; extractPalette(img); };
+    img.onerror = () => { document.getElementById('loading').classList.remove('show'); btn.disabled = false; document.getElementById('error').textContent = '⚠️ 圖片產生失敗'; document.getElementById('error').style.display = 'block'; };
+    img.src = `/generate-image?prompt=${encodeURIComponent(data.optimized_prompt)}&seed=${seed}&size=${size}&negative=${encodeURIComponent(negative)}&zh=${encodeURIComponent(prompt)}&mode=${mode}&style=${style}`;
+  } catch (e) { document.getElementById('loading').classList.remove('show'); btn.disabled = false; showError(e.message); }
+}
+function showError(msg) { const el = document.getElementById('error'); el.textContent = '❌ ' + msg; el.style.display = 'block'; }
+function downloadImage() { const img = document.getElementById('aiImage'); if (!img.src) return; const a = document.createElement('a'); a.download = 'ai-image.png'; a.href = img.src; a.click(); }
+
+// === Palette ===
+function extractPalette(img) {
+  const c = document.createElement('canvas'), ctx = c.getContext('2d');
+  c.width = c.height = 64;
+  try {
+    ctx.drawImage(img, 0, 0, 64, 64);
+    const d = ctx.getImageData(0, 0, 64, 64).data;
+    const map = {};
+    for (let i = 0; i < d.length; i += 16) {
+      const k = `${Math.round(d[i]/32)*32},${Math.round(d[i+1]/32)*32},${Math.round(d[i+2]/32)*32}`;
+      map[k] = (map[k] || 0) + 1;
+    }
+    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const el = document.getElementById('palette');
+    el.innerHTML = sorted.map(([k]) => { const [r,g,b] = k.split(','); const h = '#'+[r,g,b].map(c=>parseInt(c).toString(16).padStart(2,'0')).join(''); return `<div class="swatch" style="background:${h}" onclick="navigator.clipboard.writeText('${h}')" title="複製 ${h}"><span class="hex">${h}</span></div>`; }).join('');
+    el.classList.add('show');
+  } catch(e) {}
+}
+
+// ===== 2. Story =====
+async function generateStory() {
+  const theme = document.getElementById('storyTheme').value.trim();
+  if (!theme) { alert('請輸入故事主題'); return; }
+  const style = document.getElementById('storyStyle').value;
+  const resultDiv = document.getElementById('storyResult');
+  const loading = document.getElementById('storyLoading');
+  resultDiv.innerHTML = '';
+  loading.style.display = 'block';
+  try {
+    const res = await fetch('/storyboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme, style }) });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || '失敗'); }
+    const data = await res.json();
+    loading.style.display = 'none';
+    if (!data.scenes || !data.scenes.length) throw new Error('沒有產生故事');
+    resultDiv.innerHTML = `<h2 style="font-size:18px;margin-bottom:12px;text-align:center">📖 ${data.title}</h2>`;
+    data.scenes.forEach((scene, i) => {
+      const div = document.createElement('div');
+      div.className = 'scene';
+      div.innerHTML = `<div class="num">第 ${i+1} 幕</div><div class="para">${scene.paragraph}</div><div class="gen-pending">⏳ 產生圖片中...</div>`;
+      resultDiv.appendChild(div);
+      const img = new Image();
+      const seed = Math.floor(Math.random() * 99999);
+      img.onload = () => { div.querySelector('.gen-pending').remove(); div.appendChild(img); };
+      img.onerror = () => { div.querySelector('.gen-pending').textContent = '❌ 圖片生成失敗'; };
+      img.style.cssText = 'width:100%;border-radius:8px;background:#111';
+      img.src = `/generate-image?prompt=${encodeURIComponent(scene.prompt)}&seed=${seed}&size=512x512&zh=${encodeURIComponent(scene.paragraph)}&mode=single&style=${style}`;
+    });
   } catch (e) {
-    document.getElementById('loading').classList.remove('show');
-    document.getElementById('genBtn').disabled = false;
-    showError(e.message);
+    loading.style.display = 'none';
+    resultDiv.innerHTML = `<div style="color:#ff6b6b;text-align:center;padding:20px">❌ ${e.message}</div>`;
   }
 }
 
-function showError(msg) {
-  const el = document.getElementById('error');
-  el.textContent = '❌ ' + msg;
-  el.style.display = 'block';
-}
-
-function downloadImage() {
-  const img = document.getElementById('aiImage');
-  if (!img.src) return;
-  const link = document.createElement('a');
-  link.download = 'ai-image.png';
-  link.href = img.src;
-  link.click();
-}
-
-// === Palette Extraction ===
-function extractPalette(img) {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  const s = 64; // sample size
-  canvas.width = s;
-  canvas.height = s;
-  try {
-    ctx.drawImage(img, 0, 0, s, s);
-    const data = ctx.getImageData(0, 0, s, s).data;
-    const colorMap = {};
-    for (let i = 0; i < data.length; i += 16) { // sample every 4th pixel
-      const r = Math.round(data[i] / 32) * 32;
-      const g = Math.round(data[i+1] / 32) * 32;
-      const b = Math.round(data[i+2] / 32) * 32;
-      const key = `${r},${g},${b}`;
-      colorMap[key] = (colorMap[key] || 0) + 1;
-    }
-    const sorted = Object.entries(colorMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
-    const palette = document.getElementById('palette');
-    palette.innerHTML = sorted.map(([key]) => {
-      const [r, g, b] = key.split(',').map(Number);
-      const hex = '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
-      return `<div class="swatch" style="background:${hex}" onclick="copyColor('${hex}')" title="按一下複製 ${hex}"><span class="hex">${hex}</span></div>`;
-    }).join('');
-    palette.classList.add('show');
-  } catch (e) { /* ignore canvas errors */ }
-}
-
-function copyColor(hex) {
-  navigator.clipboard.writeText(hex).catch(() => {});
-}
-
-// === Chat ===
-const chatBox = document.getElementById('chatBox');
-const chatInput = document.getElementById('chatInput');
+// ===== 3. Chat =====
+const chatBox = document.getElementById('chatBox'), chatInput = document.getElementById('chatInput');
 let chatHistory = [];
-
-function addChatMsg(text, role) {
-  const div = document.createElement('div');
-  div.className = 'chat-msg ' + role;
-  div.textContent = text;
-  chatBox.appendChild(div);
-  chatBox.scrollTop = chatBox.scrollHeight;
-}
-
+function addChatMsg(text, role) { const d = document.createElement('div'); d.className = 'chat-msg ' + role; d.textContent = text; chatBox.appendChild(d); chatBox.scrollTop = chatBox.scrollHeight; }
 async function sendChatMessage() {
   const msg = chatInput.value.trim();
   if (!msg) return;
   chatInput.value = '';
   addChatMsg(msg, 'user');
   chatHistory.push({ role: 'user', content: msg });
-  const loadingDiv = document.createElement('div');
-  loadingDiv.className = 'chat-msg loading';
-  loadingDiv.textContent = '⏳';
-  chatBox.appendChild(loadingDiv);
+  const ld = document.createElement('div'); ld.className = 'chat-msg loading'; ld.textContent = '⏳'; chatBox.appendChild(ld);
   try {
-    const res = await fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, history: chatHistory.slice(-10) })
-    });
-    if (!res.ok) {
-      const e = await res.json();
-      throw new Error(e.error || '連線失敗');
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let reply = '';
-    loadingDiv.remove();
-    const replyDiv = document.createElement('div');
-    replyDiv.className = 'chat-msg bot';
-    chatBox.appendChild(replyDiv);
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      reply += decoder.decode(value, { stream: true });
-      replyDiv.textContent = reply;
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
+    const res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg, history: chatHistory.slice(-10) }) });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || '連線失敗'); }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let reply = ''; ld.remove();
+    const rd = document.createElement('div'); rd.className = 'chat-msg bot'; chatBox.appendChild(rd);
+    while (true) { const { done, value } = await reader.read(); if (done) break; reply += dec.decode(value, { stream: true }); rd.textContent = reply; chatBox.scrollTop = chatBox.scrollHeight; }
     chatHistory.push({ role: 'assistant', content: reply });
-  } catch (e) {
-    loadingDiv.remove();
-    addChatMsg(e.message, 'error');
-  }
+  } catch (e) { ld.remove(); addChatMsg(e.message, 'error'); }
 }
 
-// === Image-to-Image ===
+// ===== 4. img2img =====
 let uploadedImageB64 = '';
-
 function handleUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    const b64 = ev.target.result.split(',')[1];
-    uploadedImageB64 = b64;
-    document.getElementById('uploadText').textContent = file.name;
-    const preview = document.getElementById('uploadPreview');
-    preview.src = ev.target.result;
-    preview.style.display = 'block';
-  };
-  reader.readAsDataURL(file);
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = function(ev) { uploadedImageB64 = ev.target.result.split(',')[1]; document.getElementById('uploadText').textContent = file.name; const p = document.getElementById('uploadPreview'); p.src = ev.target.result; p.style.display = 'block'; };
+  r.readAsDataURL(file);
 }
-
-const uploadArea = document.getElementById('uploadArea');
-uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
-uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-uploadArea.addEventListener('drop', e => {
-  e.preventDefault();
-  uploadArea.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) {
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      const b64 = ev.target.result.split(',')[1];
-      uploadedImageB64 = b64;
-      document.getElementById('uploadText').textContent = file.name;
-      const preview = document.getElementById('uploadPreview');
-      preview.src = ev.target.result;
-      preview.style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-  }
+document.getElementById('uploadArea').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('dragover'); });
+document.getElementById('uploadArea').addEventListener('dragleave', e => e.currentTarget.classList.remove('dragover'));
+document.getElementById('uploadArea').addEventListener('drop', e => {
+  e.preventDefault(); e.currentTarget.classList.remove('dragover');
+  const file = e.dataTransfer.files[0]; if (file && file.type.startsWith('image/')) { const r = new FileReader(); r.onload = function(ev) { uploadedImageB64 = ev.target.result.split(',')[1]; document.getElementById('uploadText').textContent = file.name; const p = document.getElementById('uploadPreview'); p.src = ev.target.result; p.style.display = 'block'; }; r.readAsDataURL(file); }
 });
-
 async function sendImg2Img() {
-  const prompt = document.getElementById('img2imgPrompt').value.trim();
-  if (!prompt || !uploadedImageB64) { alert('請上傳圖片並輸入修改描述'); return; }
-  const btn = document.querySelector('#tab-img2img button');
-  btn.disabled = true;
-  btn.textContent = '⏳ 處理中...';
+  if (!document.getElementById('img2imgPrompt').value.trim() || !uploadedImageB64) { alert('請上傳圖片並輸入修改描述'); return; }
+  const btn = document.querySelector('#tab-img2img button'); btn.disabled = true; btn.textContent = '⏳ 處理中...';
   document.getElementById('img2imgResult').style.display = 'none';
   try {
-    const res = await fetch('/img2img', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, image: uploadedImageB64 })
-    });
+    const res = await fetch('/img2img', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: document.getElementById('img2imgPrompt').value.trim(), image: uploadedImageB64 }) });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error || '失敗'); }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    document.getElementById('img2imgImage').src = url;
+    document.getElementById('img2imgImage').src = URL.createObjectURL(await res.blob());
     document.getElementById('img2imgResult').style.display = 'block';
-  } catch (e) {
-    alert('錯誤: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '🎨 生成';
-  }
+  } catch (e) { alert('錯誤: ' + e.message); } finally { btn.disabled = false; btn.textContent = '🎨 生成'; }
 }
+function downloadImg2Img() { const img = document.getElementById('img2imgImage'); if (!img.src) return; const a = document.createElement('a'); a.download = 'img2img-result.png'; a.href = img.src; a.click(); }
 
-function downloadImg2Img() {
-  const img = document.getElementById('img2imgImage');
-  if (!img.src) return;
-  const link = document.createElement('a');
-  link.download = 'img2img-result.png';
-  link.href = img.src;
-  link.click();
-}
-
-// === Batch ===
+// ===== 5. Batch =====
 async function batchGenerate() {
   const prompt = document.getElementById('batchPrompt').value.trim();
   if (!prompt) { alert('請輸入提示詞'); return; }
-  const count = parseInt(document.getElementById('batchCount').value);
-  const size = document.getElementById('batchSize').value;
+  const count = parseInt(document.getElementById('batchCount').value), size = document.getElementById('batchSize').value;
   document.getElementById('batchLoading').style.display = 'block';
-  const grid = document.getElementById('batchGrid');
-  grid.innerHTML = '';
+  const grid = document.getElementById('batchGrid'); grid.innerHTML = '';
   try {
-    const res = await fetch('/optimize-prompt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, mode: 'single', style: 'realistic', code: '' })
-    });
+    const res = await fetch('/optimize-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode: 'single', style: 'realistic', code: '' }) });
     if (!res.ok) throw new Error('優化失敗');
     const data = await res.json();
-    const engPrompt = data.optimized_prompt;
-    const batchRes = await fetch(`/batch-generate?prompt=${encodeURIComponent(engPrompt)}&count=${count}&size=${size}`);
+    const batchRes = await fetch(`/batch-generate?prompt=${encodeURIComponent(data.optimized_prompt)}&count=${count}&size=${size}`);
     if (!batchRes.ok) throw new Error('批次生成失敗');
     const batchData = await batchRes.json();
     if (!batchData.images || !batchData.images.length) throw new Error('沒有生成結果');
-    batchData.images.forEach((item, i) => {
-      const img = document.createElement('img');
-      img.src = 'data:image/jpeg;base64,' + item.image;
-      img.alt = `Image ${item.seed}`;
-      img.title = `Seed: ${item.seed}`;
-      const link = document.createElement('a');
-      link.href = img.src;
-      link.download = `batch-${i+1}.png`;
-      link.appendChild(img);
-      grid.appendChild(link);
-    });
-  } catch (e) {
-    grid.innerHTML = '<div style="color:#ff6b6b;text-align:center;padding:20px">❌ ' + e.message + '</div>';
-  } finally {
-    document.getElementById('batchLoading').style.display = 'none';
-  }
+    batchData.images.forEach((item, i) => { const img = document.createElement('img'); img.src = 'data:image/jpeg;base64,' + item.image; const a = document.createElement('a'); a.href = img.src; a.download = `batch-${i+1}.png`; a.appendChild(img); grid.appendChild(a); });
+  } catch (e) { grid.innerHTML = '<div style="color:#ff6b6b;text-align:center;padding:20px">❌ ' + e.message + '</div>'; }
+  finally { document.getElementById('batchLoading').style.display = 'none'; }
 }
 
-// === TTS (Browser Speech Synthesis API) ===
+// ===== 6. Meme =====
+let memeLoadedImage = null;
+document.getElementById('memeUpload').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('dragover'); });
+document.getElementById('memeUpload').addEventListener('dragleave', e => e.currentTarget.classList.remove('dragover'));
+document.getElementById('memeUpload').addEventListener('drop', e => {
+  e.preventDefault(); e.currentTarget.classList.remove('dragover');
+  const file = e.dataTransfer.files[0]; if (file && file.type.startsWith('image/')) { const r = new FileReader(); r.onload = function(ev) { memeLoadedImage = new Image(); memeLoadedImage.onload = () => { document.getElementById('memePreview').src = ev.target.result; document.getElementById('memePreview').style.display = 'block'; document.getElementById('memeUploadText').textContent = file.name; }; memeLoadedImage.src = ev.target.result; }; r.readAsDataURL(file); }
+});
+function loadMemeImage(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = function(ev) { memeLoadedImage = new Image(); memeLoadedImage.onload = () => { document.getElementById('memePreview').src = ev.target.result; document.getElementById('memePreview').style.display = 'block'; document.getElementById('memeUploadText').textContent = file.name; }; memeLoadedImage.src = ev.target.result; };
+  r.readAsDataURL(file);
+}
+function renderMeme() {
+  if (!memeLoadedImage) { alert('請先上傳圖片'); return; }
+  const top = document.getElementById('memeTop').value;
+  const bottom = document.getElementById('memeBottom').value;
+  const canvas = document.getElementById('memeCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 600, H = Math.round(600 * memeLoadedImage.height / memeLoadedImage.width);
+  canvas.width = W; canvas.height = H + (top ? 60 : 0) + (bottom ? 60 : 0);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let yOff = top ? 60 : 0;
+  ctx.drawImage(memeLoadedImage, 0, yOff, W, H);
+  ctx.textAlign = 'center';
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+  ctx.fillStyle = '#fff';
+  function drawText(text, y) {
+    const fs = Math.min(48, Math.floor(W * 0.08));
+    ctx.font = `bold ${fs}px Impact, Arial Black, sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.lineWidth = fs * 0.12;
+    ctx.strokeText(text, W/2, y);
+    ctx.fillText(text, W/2, y);
+  }
+  if (top) drawText(top, 8);
+  if (bottom) drawText(bottom, canvas.height - 56);
+  document.getElementById('memeCanvasWrap').style.display = 'block';
+  document.getElementById('memeDlBtn').style.display = 'inline-block';
+}
+function downloadMeme() {
+  const canvas = document.getElementById('memeCanvas');
+  const a = document.createElement('a'); a.download = 'meme.png'; a.href = canvas.toDataURL(); a.click();
+}
+
+// ===== 7. Collage =====
+let collageImages = [];
+document.getElementById('collageUpload').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('dragover'); });
+document.getElementById('collageUpload').addEventListener('dragleave', e => e.currentTarget.classList.remove('dragover'));
+document.getElementById('collageUpload').addEventListener('drop', e => {
+  e.preventDefault(); e.currentTarget.classList.remove('dragover');
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  if (files.length) handleCollageFiles(files);
+});
+function loadCollageImages(e) { handleCollageFiles(Array.from(e.target.files).filter(f => f.type.startsWith('image/'))); }
+function handleCollageFiles(files) {
+  files.forEach(file => {
+    const r = new FileReader();
+    r.onload = function(ev) {
+      const img = new Image();
+      img.onload = () => { collageImages.push(img); renderCollageThumbs(); };
+      img.src = ev.target.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function renderCollageThumbs() {
+  const div = document.getElementById('collageThumbs');
+  div.innerHTML = collageImages.map((img, i) => `<img src="${img.src}" onclick="removeCollageImg(${i})" title="點擊移除">`).join('');
+  document.getElementById('collageUploadText').textContent = collageImages.length ? `已選擇 ${collageImages.length} 張圖片（點擊圖片移除）` : '點擊選擇多張圖片（或拖曳）';
+}
+function removeCollageImg(i) { collageImages.splice(i, 1); renderCollageThumbs(); }
+async function renderCollage() {
+  const layout = document.getElementById('collageLayout').value;
+  const [cols, rows] = layout.split('x').map(Number);
+  const needed = cols * rows;
+  if (collageImages.length < needed) { alert(`需要 ${needed} 張圖片，目前只有 ${collageImages.length} 張`); return; }
+  const cellW = 200, cellH = 200;
+  const canvas = document.createElement('canvas');
+  canvas.width = cols * cellW; canvas.height = rows * cellH;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const imgs = collageImages.slice(0, needed);
+  for (let i = 0; i < imgs.length; i++) {
+    const x = (i % cols) * cellW, y = Math.floor(i / cols) * cellH;
+    const img = imgs[i];
+    const scale = Math.max(cellW / img.width, cellH / img.height);
+    const sw = img.width * scale, sh = img.height * scale;
+    const sx = x + (cellW - sw) / 2, sy = y + (cellH - sh) / 2;
+    ctx.drawImage(img, sx, sy, sw, sh);
+  }
+  const resultDiv = document.getElementById('collageResult');
+  resultDiv.innerHTML = '';
+  resultDiv.style.display = 'block';
+  resultDiv.appendChild(canvas);
+  canvas.style.cssText = 'width:100%;border-radius:12px';
+  document.getElementById('collageDlBtn').style.display = 'inline-block';
+}
+function downloadCollage() {
+  const canvas = document.querySelector('#collageResult canvas');
+  if (!canvas) return;
+  const a = document.createElement('a'); a.download = 'collage.png'; a.href = canvas.toDataURL(); a.click();
+}
+
+// ===== 8. TTS =====
 function populateVoices() {
   const sel = document.getElementById('ttsVoice');
   const voices = speechSynthesis.getVoices();
-  const zhVoices = voices.filter(v => v.lang.startsWith('zh'));
   sel.innerHTML = '<option value="">系統預設</option>';
-  zhVoices.forEach(v => {
-    const opt = document.createElement('option');
-    opt.value = v.name;
-    opt.textContent = v.name;
-    sel.appendChild(opt);
-  });
+  voices.filter(v => v.lang.startsWith('zh')).forEach(v => { const o = document.createElement('option'); o.value = v.name; o.textContent = v.name; sel.appendChild(o); });
 }
 speechSynthesis.onvoiceschanged = populateVoices;
 if (speechSynthesis.getVoices().length) populateVoices();
-
 function speakTTS() {
   const text = document.getElementById('ttsText').value.trim();
   if (!text) return;
   window.speechSynthesis.cancel();
-  const voices = speechSynthesis.getVoices();
-  const selected = document.getElementById('ttsVoice').value;
-  const rate = parseFloat(document.getElementById('ttsRate').value);
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'zh-TW';
-  utter.rate = rate;
-  if (selected) {
-    const voice = voices.find(v => v.name === selected);
-    if (voice) utter.voice = voice;
-  }
-  utter.onstart = () => { document.getElementById('ttsStatus').textContent = '🔊 朗讀中...'; };
-  utter.onend = () => { document.getElementById('ttsStatus').textContent = '✅ 朗讀完成'; };
-  utter.onerror = (e) => { document.getElementById('ttsStatus').textContent = '❌ 錯誤: ' + e.error; };
+  utter.rate = parseFloat(document.getElementById('ttsRate').value);
+  const selected = document.getElementById('ttsVoice').value;
+  if (selected) { const v = speechSynthesis.getVoices().find(v => v.name === selected); if (v) utter.voice = v; }
+  utter.onstart = () => document.getElementById('ttsStatus').textContent = '🔊 朗讀中...';
+  utter.onend = () => document.getElementById('ttsStatus').textContent = '✅ 朗讀完成';
+  utter.onerror = (e) => document.getElementById('ttsStatus').textContent = '❌ 錯誤: ' + e.error;
   window.speechSynthesis.speak(utter);
 }
+function stopTTS() { window.speechSynthesis.cancel(); document.getElementById('ttsStatus').textContent = '⏹️ 已停止'; }
 
-function stopTTS() {
-  window.speechSynthesis.cancel();
-  document.getElementById('ttsStatus').textContent = '⏹️ 已停止';
-}
-
-// === History ===
+// ===== History =====
 async function loadHistory() {
   try {
     const res = await fetch('/history');
     if (!res.ok) return;
     const items = await res.json();
-    const gallery = document.getElementById('gallery');
-    const empty = document.getElementById('galleryEmpty');
+    const gallery = document.getElementById('gallery'), empty = document.getElementById('galleryEmpty');
     if (!items.length) { empty.style.display = 'block'; return; }
     empty.style.display = 'none';
-    gallery.innerHTML = items.map(item =>
-      `<div class="gallery-item" onclick="previewHistory('${item.image}')">
-        <img src="data:image/jpeg;base64,${item.image}" alt="${item.en}">
-        <div class="gallery-label">${item.mode === 'storyboard4' ? '📐分鏡' : '🖼單張'} ${item.style}</div>
-      </div>`
-    ).join('');
-  } catch (e) {}
+    gallery.innerHTML = items.map(item => `<div class="gallery-item" onclick="historyPreview('${item.image}','${item.en}')"><img src="data:image/jpeg;base64,${item.image}" alt=""><div class="gallery-label" style="padding:4px 6px;font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#1a1a2e">${item.mode === 'storyboard4' ? '📐分鏡' : '🖼單張'} ${item.style}</div></div>`).join('');
+  } catch(e) {}
 }
-
-function previewHistory(b64) {
+function historyPreview(b64, en) {
   document.querySelector('[data-tab="gen"]').click();
-  const img = document.getElementById('aiImage');
-  img.src = 'data:image/jpeg;base64,' + b64;
+  document.getElementById('aiImage').src = 'data:image/jpeg;base64,' + b64;
   document.getElementById('result').classList.add('show');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-
 loadHistory();
 setInterval(loadHistory, 5000);
 </script>

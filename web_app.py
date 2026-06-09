@@ -354,6 +354,72 @@ def batch_generate():
     return jsonify({"images": results})
 
 
+@app.route("/storyboard", methods=["POST"])
+def storyboard():
+    data = request.get_json(force=True)
+    theme = data.get("theme", "").strip()
+    style = data.get("style", "realistic").strip()
+    code = data.get("code", "").strip()
+    if not theme:
+        return jsonify({"error": "請輸入故事主題"}), 400
+    if SHARE_CODE and code != SHARE_CODE:
+        return jsonify({"error": "共享密碼錯誤"}), 403
+    if not GROQ_API_KEY:
+        return jsonify({"error": "未設定 GROQ_API_KEY"}), 500
+
+    style_map = {
+        "realistic": "photorealistic style",
+        "anime": "anime style, cel shaded",
+        "watercolor": "watercolor painting style",
+        "oilpainting": "oil painting style",
+        "sketch": "pencil sketch style",
+        "pixel": "pixel art style",
+    }
+    style_inst = style_map.get(style, style_map["realistic"])
+
+    prompt = (
+        f"你是一個 AI 故事作家。請以「{theme}」為主題，創作一個簡短的故事。\n\n"
+        f"請輸出純 JSON（不要 markdown 格式），格式如下：\n"
+        f'{{"title": "故事標題", "scenes": [{{"paragraph": "第一段文字", "prompt": "這段故事的英文圖像描述（{style_inst}）"}}, ...]}}\n\n'
+        "要求：\n"
+        "- 故事要有 3~4 個場景\n"
+        "- paragraph 用繁體中文寫\n"
+        "- prompt 用英文寫，是給 AI 繪圖用的詳細描述，包含角色、場景、氛圍\n"
+        "- 只輸出 JSON，不要任何其他文字"
+    )
+
+    try:
+        resp = requests.post(GROQ_URL, json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.8,
+            "response_format": {"type": "json_object"},
+        }, headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        }, timeout=30)
+
+        if resp.status_code != 200:
+            return jsonify({"error": f"Groq 連線失敗 ({resp.status_code})"}), 502
+
+        result = resp.json()
+        text = result["choices"][0]["message"]["content"].strip()
+        import json as json_mod
+        try:
+            parsed = json_mod.loads(text)
+        except Exception:
+            # try to extract JSON from markdown
+            import re
+            m = re.search(r'\{.*\}', text, re.DOTALL)
+            if m:
+                parsed = json_mod.loads(m.group())
+            else:
+                return jsonify({"error": "JSON 解析失敗", "raw": text[:500]}), 502
+        return jsonify(parsed)
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 502
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
