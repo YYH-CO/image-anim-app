@@ -60,19 +60,39 @@ def optimize_prompt():
 
 @app.route("/debug")
 def debug():
-    import socket
+    import socket, requests as req
     info = {
         "HF_TOKEN_SET": bool(HF_TOKEN),
         "HF_TOKEN_PREFIX": HF_TOKEN[:8] + "..." if HF_TOKEN else "N/A",
         "HF_MODEL": HF_MODEL,
         "GROQ_API_KEY_SET": bool(GROQ_API_KEY),
-        "api_inference_resolves": None,
     }
+    # DNS test
+    hosts = ["api-inference.huggingface.co", "huggingface.co", "google.com"]
+    for h in hosts:
+        try:
+            socket.getaddrinfo(h, 443)
+            info[f"dns_{h}"] = True
+        except Exception as e:
+            info[f"dns_{h}"] = str(e)
+    # Direct HTTP test to huggingface.co
     try:
-        socket.getaddrinfo("api-inference.huggingface.co", 443)
-        info["api_inference_resolves"] = True
-    except Exception:
-        info["api_inference_resolves"] = False
+        r = req.get("https://huggingface.co", timeout=10)
+        info["http_huggingface"] = r.status_code
+    except Exception as e:
+        info["http_huggingface"] = str(e)[:100]
+    # Test HF Inference API via direct IP or alternative
+    try:
+        r = req.post(
+            f"https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5",
+            json={"inputs": "test"},
+            headers={"Authorization": f"Bearer {HF_TOKEN}"},
+            timeout=15,
+        )
+        info["hf_api_status"] = r.status_code
+        info["hf_api_response"] = r.text[:200]
+    except Exception as e:
+        info["hf_api_exception"] = str(e)[:200]
     return jsonify(info)
 
 
