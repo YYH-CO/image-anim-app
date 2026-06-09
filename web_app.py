@@ -7,7 +7,8 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 SHARE_CODE = os.getenv("SHARE_CODE", "").strip()
 HF_TOKEN = os.getenv("HF_TOKEN", "").strip()
 
-HF_MODEL = os.getenv("HF_MODEL", "stabilityai/stable-diffusion-xl-base-1.0").strip()
+HF_MODEL = os.getenv("HF_MODEL", "black-forest-labs/FLUX.1-schnell").strip()
+HF_API_BASE = os.getenv("HF_API_BASE", "https://router.huggingface.co/hf-inference").strip()
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -68,7 +69,7 @@ def debug():
         "GROQ_API_KEY_SET": bool(GROQ_API_KEY),
     }
     # DNS test
-    hosts = ["api-inference.huggingface.co", "huggingface.co", "google.com"]
+    hosts = ["router.huggingface.co", "api-inference.huggingface.co", "huggingface.co", "google.com"]
     for h in hosts:
         try:
             socket.getaddrinfo(h, 443)
@@ -116,14 +117,13 @@ def generate_image():
             "runwayml/stable-diffusion-v1-5",
             "stabilityai/stable-diffusion-2-1",
         ]
+        models_to_try = [HF_MODEL, "black-forest-labs/FLUX.1-schnell"]
         for model in models_to_try:
             try:
-                print(f"HF request: {model}")
+                url = f"{HF_API_BASE}/models/{model}"
+                print(f"HF request: {url}")
                 resp = requests.post(
-                    f"https://api-inference.huggingface.co/models/{model}",
-                    json=payload,
-                    headers=headers,
-                    timeout=90,
+                    url, json=payload, headers=headers, timeout=90,
                 )
                 if resp.status_code == 200:
                     ct = resp.headers.get("Content-Type", "")
