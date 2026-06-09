@@ -186,13 +186,24 @@ button:disabled { opacity: 0.5; cursor: default; }
 
   <!-- ===== Tab 5: TTS ===== -->
   <div class="tab-body" id="tab-tts">
-    <textarea id="ttsText" placeholder="輸入要轉成語音的文字...">你好，歡迎使用 AI 圖片生成器。這是一個測試語音。</textarea>
-    <div class="tts-row">
-      <button onclick="generateTTS()">🔊 生成語音</button>
-      <button class="btn-sm" id="ttsDownloadBtn" style="display:none" onclick="downloadTTS()">⬇️ 下載</button>
+    <textarea id="ttsText" placeholder="輸入要轉成語音的文字...">你好，歡迎使用 AI 多媒體工具。這是一個測試語音。</textarea>
+    <div class="row">
+      <label>🎤 語音</label>
+      <select id="ttsVoice"><option value="">系統預設</option></select>
+      <label>⚡ 速度</label>
+      <select id="ttsRate">
+        <option value="0.5">0.5x</option>
+        <option value="0.75">0.75x</option>
+        <option value="1" selected>1x</option>
+        <option value="1.25">1.25x</option>
+        <option value="1.5">1.5x</option>
+      </select>
     </div>
-    <div id="ttsLoading" style="display:none;text-align:center;padding:12px;color:#888">⏳ 生成中...</div>
-    <audio id="ttsAudio" controls style="width:100%;margin-top:8px;display:none"></audio>
+    <div class="tts-row">
+      <button onclick="speakTTS()">🔊 朗讀</button>
+      <button class="btn-sm" onclick="stopTTS()">⏹️ 停止</button>
+    </div>
+    <div id="ttsStatus" style="text-align:center;padding:8px;color:#888;font-size:13px">✅ 就緒</div>
   </div>
 </div>
 
@@ -458,38 +469,45 @@ async function batchGenerate() {
   }
 }
 
-// === TTS ===
-async function generateTTS() {
+// === TTS (Browser Speech Synthesis API) ===
+function populateVoices() {
+  const sel = document.getElementById('ttsVoice');
+  const voices = speechSynthesis.getVoices();
+  const zhVoices = voices.filter(v => v.lang.startsWith('zh'));
+  sel.innerHTML = '<option value="">系統預設</option>';
+  zhVoices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = v.name;
+    sel.appendChild(opt);
+  });
+}
+speechSynthesis.onvoiceschanged = populateVoices;
+if (speechSynthesis.getVoices().length) populateVoices();
+
+function speakTTS() {
   const text = document.getElementById('ttsText').value.trim();
-  if (!text) { alert('請輸入文字'); return; }
-  document.getElementById('ttsLoading').style.display = 'block';
-  document.getElementById('ttsAudio').style.display = 'none';
-  document.getElementById('ttsDownloadBtn').style.display = 'none';
-  try {
-    const res = await fetch('/tts?text=' + encodeURIComponent(text));
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'TTS 失敗'); }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = document.getElementById('ttsAudio');
-    audio.src = url;
-    audio.style.display = 'block';
-    audio.play();
-    document.getElementById('ttsDownloadBtn').style.display = 'inline-block';
-    document.getElementById('ttsDownloadBtn').onclick = () => {
-      const link = document.createElement('a');
-      link.download = 'tts-audio.wav';
-      link.href = url;
-      link.click();
-    };
-  } catch (e) {
-    alert('錯誤: ' + e.message);
-  } finally {
-    document.getElementById('ttsLoading').style.display = 'none';
+  if (!text) return;
+  window.speechSynthesis.cancel();
+  const voices = speechSynthesis.getVoices();
+  const selected = document.getElementById('ttsVoice').value;
+  const rate = parseFloat(document.getElementById('ttsRate').value);
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'zh-TW';
+  utter.rate = rate;
+  if (selected) {
+    const voice = voices.find(v => v.name === selected);
+    if (voice) utter.voice = voice;
   }
+  utter.onstart = () => { document.getElementById('ttsStatus').textContent = '🔊 朗讀中...'; };
+  utter.onend = () => { document.getElementById('ttsStatus').textContent = '✅ 朗讀完成'; };
+  utter.onerror = (e) => { document.getElementById('ttsStatus').textContent = '❌ 錯誤: ' + e.error; };
+  window.speechSynthesis.speak(utter);
 }
 
-function downloadTTS() {
-  document.getElementById('ttsDownloadBtn').click();
+function stopTTS() {
+  window.speechSynthesis.cancel();
+  document.getElementById('ttsStatus').textContent = '⏹️ 已停止';
 }
 
 // === History ===

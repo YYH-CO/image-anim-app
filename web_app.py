@@ -282,33 +282,9 @@ def chat():
 
 @app.route("/tts")
 def tts():
-    text = request.args.get("text", "").strip()
-    if not text:
-        return "Missing text", 400
-    if not HF_TOKEN:
-        return "No HF_TOKEN", 500
-
-    errors = []
-    for model, payload in [
-        ("facebook/mms-tts", {"inputs": text, "parameters": {"language": "zho"}}),
-        ("facebook/mms-tts", {"inputs": text}),
-        ("espnet/kan-bayashi_ljspeech_vits", {"inputs": text}),
-    ]:
-        try:
-            resp = requests.post(
-                f"{HF_API_BASE}/models/{model}",
-                json=payload,
-                headers={"Authorization": f"Bearer {HF_TOKEN}"},
-                timeout=30,
-            )
-            if resp.status_code == 200:
-                ct = resp.headers.get("Content-Type", "")
-                if "audio" in ct or len(resp.content) > 1000:
-                    return Response(resp.content, mimetype="audio/wav")
-            errors.append(f"{model}: HTTP {resp.status_code}")
-        except Exception as e:
-            errors.append(f"{model}: {str(e)[:60]}")
-    return jsonify({"error": "所有 TTS 模型皆失敗", "detail": "; ".join(errors)}), 502
+    # Backend TTS is unreliable via router; frontend uses browser Web Speech API
+    # This endpoint is kept as fallback
+    return jsonify({"error": "前端的瀏覽器語音 API 更穩定，請直接使用播放按鈕"}), 501
 
 
 @app.route("/img2img", methods=["POST"])
