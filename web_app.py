@@ -27,8 +27,35 @@ def optimize_prompt():
         return jsonify({"error": "共享密碼錯誤"}), 403
 
     prompt = data.get("prompt", "").strip()
+    mode = data.get("mode", "single").strip()
+    style = data.get("style", "realistic").strip()
     if not prompt:
         return jsonify({"error": "請輸入內容"}), 400
+
+    style_map = {
+        "realistic": "photorealistic, highly detailed, cinematic lighting",
+        "anime": "anime style, cel shaded, vibrant colors, Japanese animation",
+        "watercolor": "watercolor painting style, soft edges, paper texture",
+        "oilpainting": "oil painting on canvas, thick brushstrokes, impasto",
+        "sketch": "pencil sketch, black and white, hand-drawn, cross-hatching",
+        "pixel": "pixel art style, 8-bit retro game graphics, blocky pixels",
+    }
+    style_instruction = style_map.get(style, style_map["realistic"])
+
+    if mode == "storyboard4":
+        format_instruction = (
+            "Generate a prompt for a 4-panel comic storyboard arranged in a 2x2 grid. "
+            "Describe the entire layout first, then each panel sequentially: "
+            "Panel 1 (top-left): ..., Panel 2 (top-right): ..., "
+            "Panel 3 (bottom-left): ..., Panel 4 (bottom-right): .... "
+            "Each panel should show a different scene or moment from the story. "
+            "Include clear panel borders. Style: " + style_instruction
+        )
+    else:
+        format_instruction = (
+            "Generate a highly descriptive, vivid, detailed prompt for a single image. "
+            "Style: " + style_instruction
+        )
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -39,7 +66,7 @@ def optimize_prompt():
         "messages": [
             {
                 "role": "system",
-                "content": "You are an expert AI image prompt engineer. Translate the user input into English and expand it into a highly descriptive, vivid, detailed prompt for image generation. Output ONLY the raw final expanded prompt text. No explanations, markdown, or chat text."
+                "content": "You are an expert AI image prompt engineer. Translate the user input into English and expand it into a detailed image generation prompt. " + format_instruction + " Output ONLY the raw final expanded prompt text. No explanations, markdown, or chat text."
             },
             {"role": "user", "content": prompt},
         ],

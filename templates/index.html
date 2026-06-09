@@ -16,6 +16,10 @@ input:focus { border-color: #00f5d4; }
 button { background: #00f5d4; color: #000; font-weight: 600; cursor: pointer; border: none; font-size: 16px; }
 button:hover { background: #00bbf9; color: #fff; }
 button:disabled { opacity: 0.5; cursor: default; }
+.row { display: flex; gap: 8px; margin-bottom: 12px; }
+.row select { flex: 1; padding: 10px; font-size: 14px; border-radius: 8px; border: 1px solid #333; background: #222; color: #eee; outline: none; }
+.row select:focus { border-color: #00f5d4; }
+.row label { flex: none; display: flex; align-items: center; color: #aaa; font-size: 13px; white-space: nowrap; }
 #loading { display: none; text-align: center; padding: 30px; color: #888; font-size: 14px; }
 #loading.show { display: block; }
 #result { display: none; margin-top: 16px; }
@@ -32,6 +36,24 @@ button:disabled { opacity: 0.5; cursor: default; }
   <p class="sub">中文輸入 → AI 翻譯 → Hugging Face 繪圖</p>
 
   <input type="text" id="prompt" placeholder="輸入中文，例如：一隻穿著西裝的貓在開會">
+
+  <div class="row">
+    <label>📐 模式</label>
+    <select id="mode">
+      <option value="single">單張圖片</option>
+      <option value="storyboard4">四格分鏡</option>
+    </select>
+    <label>🎨 風格</label>
+    <select id="style">
+      <option value="realistic">寫實</option>
+      <option value="anime">動漫</option>
+      <option value="watercolor">水彩</option>
+      <option value="oilpainting">油畫</option>
+      <option value="sketch">素描</option>
+      <option value="pixel">像素風</option>
+    </select>
+  </div>
+
   <button id="genBtn" onclick="generate()">✨ 生成圖片</button>
 
   <div id="loading">
@@ -52,6 +74,9 @@ async function generate() {
   const prompt = document.getElementById('prompt').value.trim();
   if (!prompt) { showError('請輸入內容'); return; }
 
+  const mode = document.getElementById('mode').value;
+  const style = document.getElementById('style').value;
+
   document.getElementById('genBtn').disabled = true;
   document.getElementById('loading').classList.add('show');
   document.getElementById('result').classList.remove('show');
@@ -61,7 +86,7 @@ async function generate() {
     const res = await fetch('/optimize-prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, mode, style })
     });
 
     if (!res.ok) {
