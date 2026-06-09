@@ -58,6 +58,24 @@ def optimize_prompt():
         return jsonify({"error": f"連線異常: {str(e)[:200]}"}), 502
 
 
+@app.route("/debug")
+def debug():
+    import socket
+    info = {
+        "HF_TOKEN_SET": bool(HF_TOKEN),
+        "HF_TOKEN_PREFIX": HF_TOKEN[:8] + "..." if HF_TOKEN else "N/A",
+        "HF_MODEL": HF_MODEL,
+        "GROQ_API_KEY_SET": bool(GROQ_API_KEY),
+        "api_inference_resolves": None,
+    }
+    try:
+        socket.getaddrinfo("api-inference.huggingface.co", 443)
+        info["api_inference_resolves"] = True
+    except Exception:
+        info["api_inference_resolves"] = False
+    return jsonify(info)
+
+
 @app.route("/generate-image")
 def generate_image():
     eng_prompt = request.args.get("prompt", "")
