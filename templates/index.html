@@ -106,6 +106,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .collage-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
 .collage-thumbs img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 2px solid #333; cursor: pointer; }
 .collage-thumbs img.selected { border-color: #00f5d4; }
+#vidStatus { text-align: center; padding: 8px; color: #888; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -121,6 +122,7 @@ button:disabled { opacity: 0.5; cursor: default; }
     <div class="tab" data-tab="batch">🔄 批次</div>
     <div class="tab" data-tab="meme">🎭 迷因</div>
     <div class="tab" data-tab="collage">🖼️ 拼貼</div>
+    <div class="tab" data-tab="vid">🎬 動畫</div>
     <div class="tab" data-tab="tts">🔊 語音</div>
   </div>
 
@@ -238,7 +240,39 @@ button:disabled { opacity: 0.5; cursor: default; }
     <div id="collageResult" style="display:none;margin-top:8px"></div>
   </div>
 
-  <!-- ===== Tab 8: TTS ===== -->
+  <!-- ===== Tab 8: Video Slideshow ===== -->
+  <div class="tab-body" id="tab-vid">
+    <div class="collage-upload-area" id="vidUpload" onclick="document.getElementById('vidFiles').click()">
+      <div id="vidUploadText">選擇多張圖片，自動輪播成影片</div>
+    </div>
+    <input type="file" id="vidFiles" accept="image/*" multiple style="display:none" onchange="loadVidImages(event)">
+    <div class="collage-thumbs" id="vidThumbs"></div>
+    <div class="row">
+      <label>🎬 轉場</label>
+      <select id="vidTransition">
+        <option value="fade">淡入淡出</option>
+        <option value="slide">滑動</option>
+        <option value="zoom">縮放</option>
+      </select>
+      <label>⏱ 秒/張</label>
+      <select id="vidDuration">
+        <option value="1">1</option>
+        <option value="2" selected>2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+      </select>
+    </div>
+    <div class="row">
+      <button id="vidPlayBtn" onclick="playVid()">▶️ 播放</button>
+      <button class="btn-sm" id="vidDlBtn" style="display:none" onclick="downloadVid()">⬇️ 下載影片</button>
+    </div>
+    <div style="background:#111;border-radius:12px;overflow:hidden;margin-top:8px">
+      <canvas id="vidCanvas" style="width:100%;display:block"></canvas>
+    </div>
+    <div id="vidStatus" style="text-align:center;padding:8px;color:#888;font-size:13px">就緒</div>
+  </div>
+
+  <!-- ===== Tab 9: TTS ===== -->
   <div class="tab-body" id="tab-tts">
     <textarea id="ttsText" placeholder="輸入要轉成語音的文字...">你好，歡迎使用 AI 多媒體工具。</textarea>
     <div class="row">
@@ -563,7 +597,138 @@ function downloadCollage() {
   const a = document.createElement('a'); a.download = 'collage.png'; a.href = canvas.toDataURL(); a.click();
 }
 
-// ===== 8. TTS =====
+// ===== 8. Video Slideshow =====
+let vidImages = [];
+let vidAnimId = null;
+
+document.getElementById('vidUpload').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('dragover'); });
+document.getElementById('vidUpload').addEventListener('dragleave', e => e.currentTarget.classList.remove('dragover'));
+document.getElementById('vidUpload').addEventListener('drop', e => {
+  e.preventDefault(); e.currentTarget.classList.remove('dragover');
+  handleVidFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
+});
+function loadVidImages(e) { handleVidFiles(Array.from(e.target.files).filter(f => f.type.startsWith('image/'))); }
+function handleVidFiles(files) {
+  files.forEach(file => {
+    const r = new FileReader();
+    r.onload = function(ev) {
+      const img = new Image();
+      img.onload = () => { vidImages.push(img); renderVidThumbs(); };
+      img.src = ev.target.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function renderVidThumbs() {
+  const div = document.getElementById('vidThumbs');
+  div.innerHTML = vidImages.map((img, i) => `<img src="${img.src}" onclick="removeVidImg(${i})" title="點擊移除">`).join('');
+  document.getElementById('vidUploadText').textContent = vidImages.length ? `${vidImages.length} 張圖片（點擊移除）` : '選擇多張圖片，自動輪播成影片';
+}
+
+function removeVidImg(i) { vidImages.splice(i, 1); renderVidThumbs(); stopVid(); }
+
+function playVid() {
+  if (vidImages.length < 2) { alert('至少需要 2 張圖片'); return; }
+  const canvas = document.getElementById('vidCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 600, H = 400;
+  canvas.width = W; canvas.height = H;
+  const duration = parseFloat(document.getElementById('vidDuration').value);
+  const transition = document.getElementById('vidTransition').value;
+  const totalTime = (duration + 0.5) * vidImages.length;
+  const btn = document.getElementById('vidPlayBtn');
+  btn.textContent = '⏹️ 停止';
+  btn.onclick = stopVid;
+  document.getElementById('vidStatus').textContent = '▶️ 播放中...';
+
+  if (vidAnimId) cancelAnimationFrame(vidAnimId);
+  const start = performance.now();
+
+  function drawImage(img, x, y, w, h) {
+    const s = Math.max(w / img.width, h / img.height);
+    const sw = img.width * s, sh = img.height * s;
+    ctx.drawImage(img, x + (w - sw) / 2, y + (h - sh) / 2, sw, sh);
+  }
+
+  function frame(now) {
+    const t = ((now - start) / 1000) % totalTime;
+    const segLen = duration + 0.5;
+    const seg = Math.floor(t / segLen);
+    const localT = (t - seg * segLen);
+    const i0 = seg % vidImages.length;
+    const i1 = (seg + 1) % vidImages.length;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    if (localT < duration) {
+      drawImage(vidImages[i0], 0, 0, W, H);
+    } else {
+      const progress = (localT - duration) / 0.5;
+      switch (transition) {
+        case 'slide':
+          drawImage(vidImages[i0], -W * progress, 0, W, H);
+          drawImage(vidImages[i1], W * (1 - progress), 0, W, H);
+          break;
+        case 'zoom':
+          const s0 = 1 + progress * 0.15;
+          const s1 = 0.85 + progress * 0.15;
+          ctx.save();
+          ctx.translate(W/2, H/2);
+          ctx.scale(s0, s0);
+          ctx.globalAlpha = 1 - progress;
+          ctx.drawImage(vidImages[i0], -W/2, -H/2, W, H);
+          ctx.restore();
+          ctx.save();
+          ctx.translate(W/2, H/2);
+          ctx.scale(s1, s1);
+          ctx.globalAlpha = progress;
+          ctx.drawImage(vidImages[i1], -W/2, -H/2, W, H);
+          ctx.restore();
+          break;
+        default: // fade
+          ctx.globalAlpha = 1 - progress;
+          drawImage(vidImages[i0], 0, 0, W, H);
+          ctx.globalAlpha = progress;
+          drawImage(vidImages[i1], 0, 0, W, H);
+          break;
+      }
+    }
+    vidAnimId = requestAnimationFrame(frame);
+  }
+  vidAnimId = requestAnimationFrame(frame);
+  document.getElementById('vidDlBtn').style.display = 'none';
+}
+
+function stopVid() {
+  if (vidAnimId) { cancelAnimationFrame(vidAnimId); vidAnimId = null; }
+  const btn = document.getElementById('vidPlayBtn');
+  btn.textContent = '▶️ 播放';
+  btn.onclick = playVid;
+  document.getElementById('vidStatus').textContent = '⏹️ 已停止';
+}
+
+async function downloadVid() {
+  const canvas = document.getElementById('vidCanvas');
+  if (!canvas || vidImages.length < 2) return;
+  document.getElementById('vidStatus').textContent = '⏳ 錄製中...';
+  const stream = canvas.captureStream(30);
+  const mr = new MediaRecorder(stream, { mimeType: 'video/webm' });
+  const chunks = [];
+  mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  mr.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const a = document.createElement('a');
+    a.download = 'slideshow.webm';
+    a.href = URL.createObjectURL(blob);
+    a.click();
+    document.getElementById('vidStatus').textContent = '✅ 已下載';
+  };
+  mr.start();
+  // Stop recording after one full loop + buffer
+  const duration = parseFloat(document.getElementById('vidDuration').value);
+  setTimeout(() => { mr.stop(); }, (duration + 0.5) * vidImages.length * 1000 + 500);
+}
+
+// ===== 9. TTS =====
 function populateVoices() {
   const sel = document.getElementById('ttsVoice');
   const voices = speechSynthesis.getVoices();
