@@ -7,8 +7,6 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 SHARE_CODE = os.getenv("SHARE_CODE", "").strip()
 HF_TOKEN = os.getenv("HF_TOKEN", "").strip()
 
-HF_API_URL = os.getenv("HF_API_URL", "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-2-1").strip()
-
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # In-memory history (max 20)
