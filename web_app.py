@@ -170,20 +170,16 @@ def generate_image():
         except Exception:
             continue
 
-    # 3. 備援防線：Hugging Face Stable Diffusion 2.1
-    if HF_TOKEN:
-        try:
-            print("💡 Pollinations 觸發限速，正式啟動第二防線：Hugging Face Stable-Diffusion...")
-            hf_headers = {
-                "Authorization": f"Bearer {HF_TOKEN}",
-                "Content-Type": "application/json"
-            }
-            hf_resp = requests.post(HF_API_URL, headers=hf_headers, json={"inputs": eng_prompt}, timeout=25)
-            if hf_resp.status_code == 200 and hf_resp.content:
-                return Response(hf_resp.content, mimetype="image/jpeg")
-            print(f"Hugging Face 備援回報錯誤狀態碼: {hf_resp.status_code} - {hf_resp.text[:100]}")
-        except Exception as hf_err:
-            print(f"Hugging Face 連線異常: {str(hf_err)}")
+    # 3. 備援防線：Pollinations Turbo 極速通道（不卡 IP 佇列）
+    try:
+        print("💡 第一防線 Flux 擁堵，正式啟動第二防線：Pollinations Turbo 極速通道...")
+        turbo_url = f"https://pollinations.ai{requests.utils.quote(eng_prompt)}?width=1024&height=1024&seed={seed}&nofeed=true&model=turbo"
+        turbo_resp = requests.get(turbo_url, timeout=20)
+        if turbo_resp.status_code == 200:
+            return Response(turbo_resp.content, mimetype="image/jpeg")
+        print(f"Turbo 備援通道也忙碌: {turbo_resp.status_code}")
+    except Exception as turbo_err:
+        print(f"Turbo 通道連線異常: {str(turbo_err)}")
 
     # 4. 終極保底：Pillow 本地渲染文字圖
     import io
