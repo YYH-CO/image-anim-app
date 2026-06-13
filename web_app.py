@@ -107,8 +107,6 @@ def debug():
     import socket, requests as req
     info = {
         "HF_TOKEN_SET": bool(HF_TOKEN),
-        "HF_TOKEN_PREFIX": HF_TOKEN[:8] + "..." if HF_TOKEN else "N/A",
-        "HF_MODEL": HF_MODEL,
         "GROQ_API_KEY_SET": bool(GROQ_API_KEY),
     }
     # DNS test
@@ -284,34 +282,7 @@ def tts():
 
 @app.route("/img2img", methods=["POST"])
 def img2img():
-    data = request.get_json(force=True)
-    prompt = data.get("prompt", "").strip()
-    image_b64 = data.get("image", "")
-    if not prompt or not image_b64:
-        return jsonify({"error": "需要 prompt 和圖片"}), 400
-    if not HF_TOKEN:
-        return jsonify({"error": "未設定 HF_TOKEN"}), 500
-
-    import base64
-    try:
-        image_bytes = base64.b64decode(image_b64)
-    except Exception:
-        return jsonify({"error": "圖片格式錯誤"}), 400
-
-    try:
-        resp = requests.post(
-            f"{HF_API_BASE}/models/stabilityai/stable-diffusion-2-1",
-            json={"inputs": prompt, "image": image_b64},
-            headers={"Authorization": f"Bearer {HF_TOKEN}"},
-            timeout=60,
-        )
-        if resp.status_code == 200:
-            ct = resp.headers.get("Content-Type", "")
-            if "image" in ct or len(resp.content) > 1000:
-                return Response(resp.content, mimetype=ct if "image" in ct else "image/jpeg")
-        return jsonify({"error": resp.text[:200]}), 502
-    except Exception as e:
-        return jsonify({"error": str(e)[:200]}), 502
+    return jsonify({"error": "img2img 暫時停用（HF 額度已耗盡）"}), 503
 
 
 @app.route("/batch-generate")
