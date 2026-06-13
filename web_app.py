@@ -147,7 +147,7 @@ def generate_image():
 
     # 1. 建立多元引導的 Pollinations URL 輪詢清單
     urls = []
-    base = f"https://pollinations.ai{requests.utils.quote(eng_prompt)}"
+    base = f"https://pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}"
     urls.append(f"{base}?width=1024&height=1024&seed={seed}&nofeed=true&model=flux")
     urls.append(f"{base}?width=1024&height=1024&seed={seed}&model=flux")
     urls.append(f"{base}?width=1024&height=1024&nofeed=true&model=turbo")
@@ -169,7 +169,7 @@ def generate_image():
     # 3. 備援防線：Pollinations Turbo 極速通道（不卡 IP 佇列）
     try:
         print("💡 第一防線 Flux 擁堵，正式啟動第二防線：Pollinations Turbo 極速通道...")
-        turbo_url = f"https://pollinations.ai{requests.utils.quote(eng_prompt)}?width=1024&height=1024&seed={seed}&nofeed=true&model=turbo"
+        turbo_url = f"https://pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}?width=1024&height=1024&seed={seed}&nofeed=true&model=turbo"
         turbo_resp = requests.get(turbo_url, timeout=20)
         if turbo_resp.status_code == 200:
             return Response(turbo_resp.content, mimetype="image/jpeg")
