@@ -165,14 +165,16 @@ def generate_image():
 
     # Try Pollinations (free, no key needed)
     try:
-        poll_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}"
-        params = {}
+        from urllib.parse import quote
+        poll_url = f"https://image.pollinations.ai/prompt/{quote(eng_prompt, safe='')}"
+        params = {
+            "width": str(W),
+            "height": str(H),
+            "seed": str(seed),
+        }
         if negative_prompt:
             params["negative_prompt"] = negative_prompt
-        params["width"] = str(W)
-        params["height"] = str(H)
-        params["seed"] = str(seed)
-        print(f"Pollinations request: {poll_url}")
+        print(f"Pollinations request: {poll_url} params={params}")
         resp = requests.get(poll_url, params=params, timeout=90)
         if resp.status_code == 200 and len(resp.content) > 1000:
             ct = resp.headers.get("Content-Type", "")
@@ -181,9 +183,12 @@ def generate_image():
                 b64 = base64.b64encode(resp.content).decode()
                 add_history(zh_prompt, eng_prompt, mode, style_arg, b64)
                 return Response(resp.content, mimetype=ct if "image" in ct else "image/jpeg")
-        print(f"Pollinations failed: HTTP {resp.status_code}, {resp.text[:200]}")
+        err_body = resp.text[:500] if resp.text else "empty"
+        print(f"Pollinations failed: HTTP {resp.status_code}, {err_body}")
+        return jsonify({"error": f"Pollinations: HTTP {resp.status_code}", "detail": err_body}), 502
     except Exception as e:
         print(f"Pollinations exception: {e}")
+        return jsonify({"error": f"Pollinations 連線失敗", "detail": str(e)[:300]}), 502
 
     # Try Hugging Face Inference API (if credits remaining)
     hf_error = ""
