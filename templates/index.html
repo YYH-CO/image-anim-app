@@ -352,14 +352,17 @@ async function generate() {
   document.getElementById('palette').classList.remove('show');
   try {
     const res = await fetch('/optimize-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode, style, code }) });
-    if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch { msg = await res.text(); } throw new Error(msg); }
+    if (!res.ok) { let msg; try { const e = await res.json(); msg = e.detail || e.error; } catch { msg = await res.text(); } throw new Error(msg); }
     const data = await res.json();
     document.getElementById('promptDisplay').textContent = `📝 ${prompt}`;
     document.getElementById('loading').innerHTML = '<div>🚀 產生圖片中...</div>';
+    imgRes = await fetch(`/generate-image?prompt=${encodeURIComponent(data.optimized_prompt)}&seed=${seed}&size=${size}&negative=${encodeURIComponent(negative)}&zh=${encodeURIComponent(prompt)}&mode=${mode}&style=${style}`);
+    if (!imgRes.ok) { const e = await imgRes.json(); throw new Error(e.detail || e.error || '圖片生成失敗'); }
+    const blob = await imgRes.blob();
+    const imgUrl = URL.createObjectURL(blob);
     const img = document.getElementById('aiImage');
     img.onload = () => { document.getElementById('loading').classList.remove('show'); document.getElementById('result').classList.add('show'); btn.disabled = false; extractPalette(img); };
-    img.onerror = () => { document.getElementById('loading').classList.remove('show'); btn.disabled = false; document.getElementById('error').textContent = '⚠️ 圖片產生失敗'; document.getElementById('error').style.display = 'block'; };
-    img.src = `/generate-image?prompt=${encodeURIComponent(data.optimized_prompt)}&seed=${seed}&size=${size}&negative=${encodeURIComponent(negative)}&zh=${encodeURIComponent(prompt)}&mode=${mode}&style=${style}`;
+    img.src = imgUrl;
   } catch (e) { document.getElementById('loading').classList.remove('show'); btn.disabled = false; showError(e.message); }
 }
 function showError(msg) { const el = document.getElementById('error'); el.textContent = '❌ ' + msg; el.style.display = 'block'; }

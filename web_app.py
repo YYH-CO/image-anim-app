@@ -1,4 +1,4 @@
-import os, requests
+import os, requests, io, base64, traceback
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 
 app = Flask(__name__)
@@ -164,12 +164,12 @@ def generate_image():
         W, H = 1024, 1024
 
     # Try Hugging Face Inference API
+    hf_error = ""
     if HF_TOKEN:
         headers = {
             "Authorization": f"Bearer {HF_TOKEN}",
         }
         payload = {"inputs": eng_prompt}
-        # include negative prompt if provided
         if negative_prompt:
             payload["parameters"] = {"negative_prompt": negative_prompt}
 
@@ -188,45 +188,18 @@ def generate_image():
                         b64 = base64.b64encode(resp.content).decode()
                         add_history(zh_prompt, eng_prompt, mode, style_arg, b64)
                         return Response(resp.content, mimetype=ct if "image" in ct else "image/jpeg")
-                err = resp.text[:300] if resp.text else f"HTTP {resp.status_code}"
-                print(f"  -> Failed: {err}")
+                err_text = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
+                hf_error += f"[{model}] {err_text}\n"
+                print(f"  -> Failed: {err_text}")
             except Exception as e:
+                hf_error += f"[{model}] {str(e)[:200]}\n"
                 print(f"  -> Exception: {e}")
     else:
-        print("No HF_TOKEN configured")
+        hf_error = "No HF_TOKEN configured"
 
-    # Fallback: generate placeholder with prompt text
-    try:
-        from PIL import Image, ImageDraw, ImageFont
-        import io
-        W, H = 512, 512
-        img = Image.new("RGB", (W, H), (26, 26, 46))
-        d = ImageDraw.Draw(img)
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size=16)
-        except Exception:
-            font = ImageFont.load_default()
-        lines = []
-        line = ""
-        for word in eng_prompt:
-            test = f"{line}{word}"
-            if d.textlength(test, font=font) > W - 40:
-                lines.append(line)
-                line = word
-            else:
-                line = test
-        lines.append(line)
-        y = (H - len(lines) * 24) // 2
-        for line in lines:
-            tw = d.textlength(line, font=font)
-            d.text(((W - tw) // 2, y), line, fill=(180, 220, 255), font=font)
-            y += 24
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return Response(buf.getvalue(), mimetype="image/png")
-    except Exception as e:
-        print(f"Pillow fallback failed: {e}")
-        return jsonify({"error": "圖片生成服務忙碌，請稍後再試"}), 502
+    # Fallback: return error as JSON so frontend can show it
+    print(f"HF all failed. Errors:\n{hf_error}")
+    return jsonify({"error": "AI 繪圖服務暫時無法使用", "detail": hf_error[:1000]}), 502
 
 
 @app.route("/history")
