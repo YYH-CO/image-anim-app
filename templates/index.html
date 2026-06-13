@@ -354,7 +354,7 @@ async function generate() {
     const res = await fetch('/optimize-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode, style, code }) });
     if (!res.ok) { let msg; try { const e = await res.json(); msg = e.error; } catch { msg = await res.text(); } throw new Error(msg); }
     const data = await res.json();
-    document.getElementById('promptDisplay').textContent = `✨ Seed: ${seed} | ${data.optimized_prompt}`;
+    document.getElementById('promptDisplay').innerHTML = `📝 <b>${prompt}</b><br><span style="color:#666;font-size:12px">🌐 ${data.optimized_prompt}</span>`;
     document.getElementById('loading').innerHTML = '<div>🚀 產生圖片中...</div>';
     const img = document.getElementById('aiImage');
     img.onload = () => { document.getElementById('loading').classList.remove('show'); document.getElementById('result').classList.add('show'); btn.disabled = false; extractPalette(img); };
