@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AI 多媒體工具</title>
+
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, "Segoe UI", Helvetica, sans-serif; background: #121214; color: #e0e0e0; min-height: 100vh; padding: 12px; }
@@ -109,7 +110,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 <div class="card">
   <h1>🎨 AI 多媒體工具</h1>
-  <p class="sub">中文輸入 → AI 翻譯 → Hugging Face / Groq</p>
+  <p class="sub">中文輸入 → AI 翻譯 → Transformers.js 瀏覽器生圖</p>
   <div class="tabs" id="tabs">
     <div class="tab active" data-tab="gen">🖼️ 生圖</div>
     <div class="tab" data-tab="story">📖 故事</div>
@@ -300,6 +301,37 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
+// ===== Transformers.js Helper =====
+let sdPipeline = null;
+async function getSDPipeline() {
+  if (sdPipeline) return sdPipeline;
+  const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+  sdPipeline = await pipeline('text-to-image', 'Xenova/stable-diffusion-v1-5', {
+    progress_callback: (p) => {
+      if (p.status === 'download' && p.progress != null) {
+        document.getElementById('loading').innerHTML = `<div>📥 下載模型 ${Math.round(p.progress * 100)}%</div>`;
+      }
+    }
+  });
+  return sdPipeline;
+}
+async function sdGenerate(prompt) {
+  const gen = await getSDPipeline();
+  const result = await gen(prompt, { num_inference_steps: 20 });
+  const raw = result[0];
+  const canvas = document.createElement('canvas');
+  canvas.width = raw.width; canvas.height = raw.height;
+  const ctx = canvas.getContext('2d');
+  const rgba = new Uint8ClampedArray(raw.width * raw.height * 4);
+  const d = raw.data;
+  for (let i = 0; i < raw.width * raw.height; i++) {
+    rgba[i * 4] = d[i * 3]; rgba[i * 4 + 1] = d[i * 3 + 1];
+    rgba[i * 4 + 2] = d[i * 3 + 2]; rgba[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(new ImageData(rgba, raw.width, raw.height), 0, 0);
+  return new Promise(r => canvas.toBlob(r, 'image/png'));
+}
+
 // ===== 1. Generate Image =====
 function toggleAdvanced() {
   const body = document.getElementById('advancedBody');
@@ -340,10 +372,7 @@ async function generate() {
   if (!prompt) { showError('請輸入內容'); return; }
   const mode = document.getElementById('mode').value;
   const style = document.getElementById('style').value;
-  const size = document.getElementById('size').value;
-  const negative = document.getElementById('negativePrompt').value.trim();
   const code = document.getElementById('shareCode').value.trim();
-  const seed = parseInt(document.getElementById('seedInput').value) || Math.floor(Math.random() * 99999);
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
   document.getElementById('loading').classList.add('show');
@@ -351,18 +380,20 @@ async function generate() {
   document.getElementById('error').style.display = 'none';
   document.getElementById('palette').classList.remove('show');
   try {
+    document.getElementById('loading').innerHTML = '<div>⏳ 優化提示詞中...</div>';
     const res = await fetch('/optimize-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode, style, code }) });
     if (!res.ok) { let msg; try { const e = await res.json(); msg = e.detail || e.error; } catch { msg = await res.text(); } throw new Error(msg); }
     const data = await res.json();
     document.getElementById('promptDisplay').textContent = `📝 ${prompt}`;
-    document.getElementById('loading').innerHTML = '<div>🚀 產生圖片中...</div>';
-    imgRes = await fetch(`/generate-image?prompt=${encodeURIComponent(data.optimized_prompt)}&seed=${seed}&size=${size}&negative=${encodeURIComponent(negative)}&zh=${encodeURIComponent(prompt)}&mode=${mode}&style=${style}`);
-    if (!imgRes.ok) { const e = await imgRes.json(); throw new Error(e.detail || e.error || '圖片生成失敗'); }
-    const blob = await imgRes.blob();
+    document.getElementById('loading').innerHTML = '<div>🚀 瀏覽器 Stable Diffusion 生圖中...</div>';
+    const blob = await sdGenerate(data.optimized_prompt);
     const imgUrl = URL.createObjectURL(blob);
-    const img = document.getElementById('aiImage');
-    img.onload = () => { document.getElementById('loading').classList.remove('show'); document.getElementById('result').classList.add('show'); btn.disabled = false; extractPalette(img); };
-    img.src = imgUrl;
+    const displayImg = document.getElementById('aiImage');
+    displayImg.onload = () => { document.getElementById('loading').classList.remove('show'); document.getElementById('result').classList.add('show'); btn.disabled = false; extractPalette(displayImg); };
+    displayImg.src = imgUrl;
+    const fd = new FormData(); fd.append('image', blob, 'result.png');
+    fd.append('zh', prompt); fd.append('en', data.optimized_prompt); fd.append('mode', mode); fd.append('style', style);
+    fetch('/save-image', { method: 'POST', body: fd }).catch(() => {});
   } catch (e) { document.getElementById('loading').classList.remove('show'); btn.disabled = false; showError(e.message); }
 }
 function showError(msg) { const el = document.getElementById('error'); el.textContent = '❌ ' + msg; el.style.display = 'block'; }
@@ -403,18 +434,20 @@ async function generateStory() {
     loading.style.display = 'none';
     if (!data.scenes || !data.scenes.length) throw new Error('沒有產生故事');
     resultDiv.innerHTML = `<h2 style="font-size:18px;margin-bottom:12px;text-align:center">📖 ${data.title}</h2>`;
-    data.scenes.forEach((scene, i) => {
+    for (const [i, scene] of data.scenes.entries()) {
       const div = document.createElement('div');
       div.className = 'scene';
-      div.innerHTML = `<div class="num">第 ${i+1} 幕</div><div class="para">${scene.paragraph}</div><div class="gen-pending">⏳ 產生圖片中...</div>`;
+      div.innerHTML = `<div class="num">第 ${i+1} 幕</div><div class="para">${scene.paragraph}</div><div class="gen-pending">⏳ 生成圖片中...</div>`;
       resultDiv.appendChild(div);
-      const img = new Image();
-      const seed = Math.floor(Math.random() * 99999);
-      img.onload = () => { div.querySelector('.gen-pending').remove(); div.appendChild(img); };
-      img.onerror = () => { div.querySelector('.gen-pending').textContent = '❌ 圖片生成失敗'; };
-      img.style.cssText = 'width:100%;border-radius:8px;background:#111';
-      img.src = `/generate-image?prompt=${encodeURIComponent(scene.prompt)}&seed=${seed}&size=512x512&zh=${encodeURIComponent(scene.paragraph)}&mode=single&style=${style}`;
-    });
+      try {
+        const blob = await sdGenerate(scene.prompt);
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => { div.querySelector('.gen-pending')?.remove(); div.appendChild(img); };
+        img.style.cssText = 'width:100%;border-radius:8px;background:#111';
+        img.src = url;
+      } catch { div.querySelector('.gen-pending').textContent = '❌ 圖片生成失敗'; }
+    }
   } catch (e) {
     loading.style.display = 'none';
     resultDiv.innerHTML = `<div style="color:#ff6b6b;text-align:center;padding:20px">❌ ${e.message}</div>`;
@@ -474,18 +507,21 @@ function downloadImg2Img() { const img = document.getElementById('img2imgImage')
 async function batchGenerate() {
   const prompt = document.getElementById('batchPrompt').value.trim();
   if (!prompt) { alert('請輸入提示詞'); return; }
-  const count = parseInt(document.getElementById('batchCount').value), size = document.getElementById('batchSize').value;
+  const count = parseInt(document.getElementById('batchCount').value);
   document.getElementById('batchLoading').style.display = 'block';
   const grid = document.getElementById('batchGrid'); grid.innerHTML = '';
   try {
+    document.getElementById('batchLoading').innerHTML = '<div>⏳ 優化中...</div>';
     const res = await fetch('/optimize-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, mode: 'single', style: 'realistic', code: '' }) });
     if (!res.ok) throw new Error('優化失敗');
     const data = await res.json();
-    const batchRes = await fetch(`/batch-generate?prompt=${encodeURIComponent(data.optimized_prompt)}&count=${count}&size=${size}`);
-    if (!batchRes.ok) throw new Error('批次生成失敗');
-    const batchData = await batchRes.json();
-    if (!batchData.images || !batchData.images.length) throw new Error('沒有生成結果');
-    batchData.images.forEach((item, i) => { const img = document.createElement('img'); img.src = 'data:image/jpeg;base64,' + item.image; const a = document.createElement('a'); a.href = img.src; a.download = `batch-${i+1}.png`; a.appendChild(img); grid.appendChild(a); });
+    for (let i = 0; i < count; i++) {
+      document.getElementById('batchLoading').innerHTML = `<div>🚀 生成中 (${i+1}/${count})...</div>`;
+      const blob = await sdGenerate(data.optimized_prompt + ` (variation ${Math.floor(Math.random() * 99999)})`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `batch-${i+1}.png`;
+      const img = document.createElement('img'); img.src = url; a.appendChild(img); grid.appendChild(a);
+    }
   } catch (e) { grid.innerHTML = '<div style="color:#ff6b6b;text-align:center;padding:20px">❌ ' + e.message + '</div>'; }
   finally { document.getElementById('batchLoading').style.display = 'none'; }
 }

@@ -147,84 +147,86 @@ def debug():
 def generate_image():
     eng_prompt = request.args.get("prompt", "")
     seed = request.args.get("seed", "42")
-    size_str = request.args.get("size", "1024x1024")
-    negative_prompt = request.args.get("negative", "")
-    zh_prompt = request.args.get("zh", "")  # original Chinese prompt
-    mode = request.args.get("mode", "single")
-    style_arg = request.args.get("style", "realistic")
     if not eng_prompt:
         return "Missing prompt", 400
 
-    import time, base64
+    # 1. 建立多元引導的 Pollinations URL 輪詢清單
+    urls = []
+    base = f"https://pollinations.ai{requests.utils.quote(eng_prompt)}"
+    urls.append(f"{base}?width=1024&height=1024&seed={seed}&nofeed=true&model=flux")
+    urls.append(f"{base}?width=1024&height=1024&seed={seed}&model=flux")
+    urls.append(f"{base}?width=1024&height=1024&nofeed=true&model=turbo")
+    urls.append(f"{base}?width=1024&height=1024&model=turbo")
 
-    parts = size_str.split("x")
-    try:
-        W, H = int(parts[0]), int(parts[1])
-    except Exception:
-        W, H = 1024, 1024
+    # 2. 多路重試 Pollinations
+    import time
+    for url in urls:
+        try:
+            resp = requests.get(url, stream=True, timeout=15)
+            if resp.status_code == 200:
+                return Response(resp.content, mimetype="image/jpeg")
+            if resp.status_code == 402:
+                time.sleep(0.5)
+                continue
+        except Exception:
+            continue
 
-    # Try Pollinations (free, no key needed)
-    try:
-        from urllib.parse import quote
-        poll_url = f"https://image.pollinations.ai/prompt/{quote(eng_prompt, safe='')}"
-        params = {
-            "width": str(W),
-            "height": str(H),
-            "seed": str(seed),
-        }
-        if negative_prompt:
-            params["negative_prompt"] = negative_prompt
-        print(f"Pollinations request: {poll_url} params={params}")
-        resp = requests.get(poll_url, params=params, timeout=90)
-        if resp.status_code == 200 and len(resp.content) > 1000:
-            ct = resp.headers.get("Content-Type", "")
-            if "image" in ct or len(resp.content) > 2000:
-                print(f"Pollinations success: {len(resp.content)} bytes")
-                b64 = base64.b64encode(resp.content).decode()
-                add_history(zh_prompt, eng_prompt, mode, style_arg, b64)
-                return Response(resp.content, mimetype=ct if "image" in ct else "image/jpeg")
-        err_body = resp.text[:500] if resp.text else "empty"
-        print(f"Pollinations failed: HTTP {resp.status_code}, {err_body}")
-        return jsonify({"error": f"Pollinations: HTTP {resp.status_code}", "detail": err_body}), 502
-    except Exception as e:
-        print(f"Pollinations exception: {e}")
-        return jsonify({"error": f"Pollinations 連線失敗", "detail": str(e)[:300]}), 502
-
-    # Try Hugging Face Inference API (if credits remaining)
-    hf_error = ""
+    # 3. 備援防線：Hugging Face
     if HF_TOKEN:
-        headers = {
-            "Authorization": f"Bearer {HF_TOKEN}",
-        }
-        payload = {"inputs": eng_prompt}
-        if negative_prompt:
-            payload["parameters"] = {"negative_prompt": negative_prompt}
+        try:
+            print("💡 Pollinations 觸發限速，啟動第二防線：Hugging Face FLUX...")
+            hf_url = f"{HF_API_BASE}/models/{HF_MODEL}"
+            hf_headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+            hf_resp = requests.post(hf_url, headers=hf_headers, json={"inputs": eng_prompt}, timeout=25)
+            if hf_resp.status_code == 200:
+                return Response(hf_resp.content, mimetype="image/jpeg")
+            print(f"Hugging Face 備援也忙碌: {hf_resp.status_code}")
+        except Exception as hf_err:
+            print(f"Hugging Face 連線異常: {str(hf_err)}")
 
-        models_to_try = [HF_MODEL, "black-forest-labs/FLUX.1-schnell"]
-        for model in models_to_try:
-            try:
-                url = f"{HF_API_BASE}/models/{model}"
-                print(f"HF request: {url}")
-                resp = requests.post(
-                    url, json=payload, headers=headers, timeout=90,
-                )
-                if resp.status_code == 200:
-                    ct = resp.headers.get("Content-Type", "")
-                    if "image" in ct or len(resp.content) > 1000:
-                        print(f"HF success: {model}, {len(resp.content)} bytes")
-                        b64 = base64.b64encode(resp.content).decode()
-                        add_history(zh_prompt, eng_prompt, mode, style_arg, b64)
-                        return Response(resp.content, mimetype=ct if "image" in ct else "image/jpeg")
-                err_text = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
-                hf_error += f"[{model}] {err_text}\n"
-                print(f"  -> Failed: {err_text}")
-            except Exception as e:
-                hf_error += f"[{model}] {str(e)[:200]}\n"
-                print(f"  -> Exception: {e}")
+    # 4. 終極保底：Pillow 本地渲染文字圖
+    import io
+    try:
+        print("🚨 啟動終極保底方案：Pillow 渲染提示詞圖片...")
+        from PIL import Image, ImageDraw, ImageFont
+        img = Image.new("RGBA", (800, 600), (26, 26, 46, 255))
+        d = ImageDraw.Draw(img)
+        font = ImageFont.load_default()
+        lines = []
+        line = ""
+        for word in eng_prompt:
+            test = f"{line}{word}"
+            if d.textlength(test, font=font) > 700:
+                lines.append(line)
+                line = word
+            else:
+                line = test
+        lines.append(line)
+        y = (600 - len(lines) * 30) // 2
+        for line in lines:
+            tw = d.textlength(line, font=font)
+            d.text(((800 - tw) // 2, y), line, fill=(200, 200, 255, 255), font=font)
+            y += 30
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return Response(buf.getvalue(), mimetype="image/png")
+    except Exception:
+        return "系統繪圖引擎皆忙碌，請稍後再試", 502
 
-    # Fallback: return error
-    print(f"All providers failed.")
-    return jsonify({"error": "所有圖片服務皆無法使用，請稍後再試"}), 502
+
+@app.route("/save-image", methods=["POST"])
+def save_image():
+    if "image" not in request.files:
+        return jsonify({"error": "缺少圖片"}), 400
+    image_b64 = base64.b64encode(request.files["image"].read()).decode()
+    add_history(
+        request.form.get("zh", "")[:200],
+        request.form.get("en", "")[:200],
+        request.form.get("mode", "single"),
+        request.form.get("style", "realistic"),
+        image_b64,
+    )
+    return jsonify({"ok": True})
 
 
 @app.route("/history")
@@ -319,37 +321,8 @@ def img2img():
 
 @app.route("/batch-generate")
 def batch_generate():
-    eng_prompt = request.args.get("prompt", "")
-    count = int(request.args.get("count", "4"))
-    size_str = request.args.get("size", "512x512")
-    if not eng_prompt:
-        return "Missing prompt", 400
-    count = min(max(count, 1), 8)
-    import base64, concurrent.futures, requests as req
-
-    def fetch_one(seed):
-        try:
-            r = req.post(
-                f"{HF_API_BASE}/models/{HF_MODEL}",
-                json={"inputs": eng_prompt},
-                headers={"Authorization": f"Bearer {HF_TOKEN}"},
-                timeout=90,
-            )
-            if r.status_code == 200 and len(r.content) > 1000:
-                return {"seed": seed, "image": base64.b64encode(r.content).decode()}
-        except Exception:
-            pass
-        return None
-
-    results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
-        futures = [ex.submit(fetch_one, i) for i in range(count)]
-        for f in concurrent.futures.as_completed(futures):
-            r = f.result()
-            if r:
-                results.append(r)
-
-    return jsonify({"images": results})
+    # Server-side batch generation unavailable. Use Puter.js client-side.
+    return jsonify({"error": "server_side_unavailable", "detail": "請使用瀏覽器批次生圖"}), 503
 
 
 @app.route("/storyboard", methods=["POST"])
