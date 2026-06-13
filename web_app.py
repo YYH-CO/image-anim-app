@@ -148,10 +148,10 @@ def generate_image():
     # 1. 建立多元引導的 Pollinations URL 輪詢清單
     urls = []
     base = f"https://pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}"
-    urls.append(f"{base}?width=1024&height=1024&seed={seed}&nofeed=true&model=flux")
-    urls.append(f"{base}?width=1024&height=1024&seed={seed}&model=flux")
-    urls.append(f"{base}?width=1024&height=1024&nofeed=true&model=turbo")
-    urls.append(f"{base}?width=1024&height=1024&model=turbo")
+    urls.append(f"{base}?width=1024&height=1024&seed={seed}&nofeed=true&model=turbo")
+    urls.append(f"{base}?width=1024&height=1024&seed={seed}&model=turbo")
+    urls.append(f"{base}?width=1024&height=1024&nofeed=true")
+    urls.append(f"{base}?width=1024&height=1024")
 
     # 2. 多路重試 Pollinations
     import time
