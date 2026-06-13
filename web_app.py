@@ -7,8 +7,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 SHARE_CODE = os.getenv("SHARE_CODE", "").strip()
 HF_TOKEN = os.getenv("HF_TOKEN", "").strip()
 
-HF_MODEL = os.getenv("HF_MODEL", "black-forest-labs/FLUX.1-schnell").strip()
-HF_API_BASE = os.getenv("HF_API_BASE", "https://router.huggingface.co/hf-inference").strip()
+HF_API_URL = os.getenv("HF_API_URL", "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-2-1").strip()
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -171,16 +170,18 @@ def generate_image():
         except Exception:
             continue
 
-    # 3. 備援防線：Hugging Face
+    # 3. 備援防線：Hugging Face Stable Diffusion 2.1
     if HF_TOKEN:
         try:
-            print("💡 Pollinations 觸發限速，啟動第二防線：Hugging Face FLUX...")
-            hf_url = f"{HF_API_BASE}/models/{HF_MODEL}"
-            hf_headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-            hf_resp = requests.post(hf_url, headers=hf_headers, json={"inputs": eng_prompt}, timeout=25)
-            if hf_resp.status_code == 200:
+            print("💡 Pollinations 觸發限速，正式啟動第二防線：Hugging Face Stable-Diffusion...")
+            hf_headers = {
+                "Authorization": f"Bearer {HF_TOKEN}",
+                "Content-Type": "application/json"
+            }
+            hf_resp = requests.post(HF_API_URL, headers=hf_headers, json={"inputs": eng_prompt}, timeout=25)
+            if hf_resp.status_code == 200 and hf_resp.content:
                 return Response(hf_resp.content, mimetype="image/jpeg")
-            print(f"Hugging Face 備援也忙碌: {hf_resp.status_code}")
+            print(f"Hugging Face 備援回報錯誤狀態碼: {hf_resp.status_code} - {hf_resp.text[:100]}")
         except Exception as hf_err:
             print(f"Hugging Face 連線異常: {str(hf_err)}")
 
