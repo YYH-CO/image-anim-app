@@ -163,7 +163,29 @@ def generate_image():
     except Exception:
         W, H = 1024, 1024
 
-    # Try Hugging Face Inference API
+    # Try Pollinations (free, no key needed)
+    try:
+        poll_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(eng_prompt)}"
+        params = {}
+        if negative_prompt:
+            params["negative_prompt"] = negative_prompt
+        params["width"] = str(W)
+        params["height"] = str(H)
+        params["seed"] = str(seed)
+        print(f"Pollinations request: {poll_url}")
+        resp = requests.get(poll_url, params=params, timeout=90)
+        if resp.status_code == 200 and len(resp.content) > 1000:
+            ct = resp.headers.get("Content-Type", "")
+            if "image" in ct or len(resp.content) > 2000:
+                print(f"Pollinations success: {len(resp.content)} bytes")
+                b64 = base64.b64encode(resp.content).decode()
+                add_history(zh_prompt, eng_prompt, mode, style_arg, b64)
+                return Response(resp.content, mimetype=ct if "image" in ct else "image/jpeg")
+        print(f"Pollinations failed: HTTP {resp.status_code}, {resp.text[:200]}")
+    except Exception as e:
+        print(f"Pollinations exception: {e}")
+
+    # Try Hugging Face Inference API (if credits remaining)
     hf_error = ""
     if HF_TOKEN:
         headers = {
@@ -194,12 +216,10 @@ def generate_image():
             except Exception as e:
                 hf_error += f"[{model}] {str(e)[:200]}\n"
                 print(f"  -> Exception: {e}")
-    else:
-        hf_error = "No HF_TOKEN configured"
 
-    # Fallback: return error as JSON so frontend can show it
-    print(f"HF all failed. Errors:\n{hf_error}")
-    return jsonify({"error": "AI 繪圖服務暫時無法使用", "detail": hf_error[:1000]}), 502
+    # Fallback: return error
+    print(f"All providers failed.")
+    return jsonify({"error": "所有圖片服務皆無法使用，請稍後再試"}), 502
 
 
 @app.route("/history")
